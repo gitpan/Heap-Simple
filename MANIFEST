@@ -10,7 +10,7 @@ lib/Heap/Simple/StringReverse.pm
 lib/Heap/Simple/Key.pm
 lib/Heap/Simple/Array.pm
 lib/Heap/Simple/Hash.pm
+lib/Heap/Simple/Method.pm
+lib/Heap/Simple/Function.pm
 t/1.t
-t/2.t
 t/s.t
-t/n.t

@@ -1,5 +1,15 @@
 Revision history for Perl extension Heap::Simple.
 
+0.02  Thu May 15 22:03:06 2003
+        - Added testcases for > and gt
+        - Cleaned up the tests a bit
+        - Do a bit less work in the tests (faster)
+        - autocalibrate the big benchmark test.
+        - Unify n.t and s.t. Only run the number variant by default.
+        - Unify 2.t into 1.t
+        - changed the macro-expander so it supports balanced parenthesis
+        - Added the Method and Function element types for completely general
+          key fetching (not documented or tested yet)
 0.01  Wed May 14 16:59:09 2003
 	- original version; created by h2xs 1.22 with options
 		-X -n Heap::Simple

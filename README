@@ -1,4 +1,4 @@
-Heap::Simple version 0.01
+Heap::Simple version 0.02
 ========================
 
 DESCRIPTION
@@ -43,10 +43,10 @@ SYNOPSIS
     $element = $heap->first;
 
     # Find the lowest value in the hep
-    $min_key = $heap->first_key;  # returns undef on an empty heap
-    $min_key = $heap->min_key;	  # return +inf   on an empty heap
+    $min_key = $heap->first_key;  # returns undef   on an empty heap
+    $min_key = $heap->min_key;	  # return infinity on an empty heap
 
-    # Find the number of entries
+    # Find the number of elements
     $count = $heap->count;
 
     # Get/Set user_data

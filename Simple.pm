@@ -3,7 +3,7 @@ use strict;
 use Carp;
 
 use vars qw($VERSION $auto %used);
-$VERSION = "0.01";
+$VERSION = "0.02";
 $auto = "Auto";
 %used = ();
 
@@ -52,6 +52,7 @@ sub new {
     # operations (much!) cleaner.
     # So elements 0 is used for associated data
     my $self = bless [[undef, $options{user_data}]], $class;
+    # We temporarily bless $self into $class so you can play OO games with it
     my $order   = $self->_order($options{order});
     my @elements = $self->_elements($options{elements});
     my $gclass = join("::", $class, $auto, $order, @elements);
@@ -59,6 +60,7 @@ sub new {
     @{"${gclass}::ISA"} = (__PACKAGE__ . "::$elements[0]",
                            __PACKAGE__ . "::$order",
                            $class) unless @{"${gclass}::ISA"};
+    # Now rebless the result in its final generated class
     bless $self, $gclass;
     print STDERR "Generated class $gclass\n" if DEBUG;
     $self->_init(\%options);
@@ -69,6 +71,9 @@ sub _PREPARE {
     return "";
 }
 
+my $balanced;
+# String with balanced parenthesis
+$balanced = qr{[^()]*(?:\((??{$balanced})\)[^()]*)*};
 sub _make {
     my $self  = shift;
 
@@ -80,8 +85,7 @@ sub _make {
 
     my $string = shift;
     # Very simple macro expander
-    1 while $string =~
-        s/(_\w+)\(([^()]*(?:\([^()]*\)[^()]*)*)\)/$self->$1(split ',', $2)/eg;
+    1 while $string =~ s/(_\w+)\(($balanced)\)/$self->$1(split ',', $2)/eg;
     print STDERR "Code: $string\n" if DEBUG;
     no warnings 'redefine';
     no strict 'refs';
@@ -214,7 +218,7 @@ sub user_data {
 
 =head1 NAME
 
-Heap::Simple - A fast and simple classic heap
+Heap::Simple - A fast and simple classic heaps
 
 =head1 SYNOPSIS
 
@@ -237,10 +241,10 @@ Heap::Simple - A fast and simple classic heap
     $element = $heap->first;
 
     # Find the lowest value in the hep
-    $min_key = $heap->first_key;  # returns undef on an empty heap
-    $min_key = $heap->min_key;	  # return +inf   on an empty heap
+    $min_key = $heap->first_key;  # returns undef   on an empty heap
+    $min_key = $heap->min_key;	  # return infinity on an empty heap
 
-    # Find the number of entries
+    # Find the number of elements
     $count = $heap->count;
 
     # Get/Set user_data
@@ -324,10 +328,28 @@ used:
 
 and the result would have been exactly the same.
 
+=item E<lt>
+
+Indicates that keys are compared as numbers, and extraction is highest value
+first. This means that methods like L<extract_min|"extract_min"> become 
+rather confusing in name, since they extract the maximum in the sense of
+the numeric value (but it's still the smallest value in terms of the 
+abstract order relation).
+
+Repeating the example with this order gives:
+
+    use Heap::Simple;
+
+    my $heap = Heap::Simple->new(order => ">");
+    $heap->insert($_) for 8, 3, 14, -1, 3;
+    print $heap->extract_min, " " for 1..$heap->count;
+    print "\n";
+    # Will print: 14 8 3 3 -1
+
 =item lt
 
 Indicates that the keys are compared as strings, and extraction is lowest
-value first. So we could modify the above example to:
+value first. So we could modify the "<" example to:
 
     use Heap::Simple;
 
@@ -338,6 +360,20 @@ value first. So we could modify the above example to:
     # Will print: -1 14 3 3 8 at ate zzzz
 
 Notice how 14 comes before 3 as you would expect in lexical sorting.
+
+=item gt
+
+Indicates that the keys are compared as strings, and extraction is highest
+value first. The concept of "minimum" again becomes rather confusing.
+The standard example now becomes:
+
+    use Heap::Simple;
+
+    my $heap = Heap::Simple->new(order => "gt");
+    $heap->insert($_) for "ate", 8, 3, "zzzz", 14, -1, 3, "at";
+    print $heap->extract_min, " " for 1..$heap->count;
+    print "\n";
+    # Will print: zzzz ate at 8 3 3 14 -1
 
 =back
 
@@ -353,7 +389,7 @@ The following element types are currently supported:
 
 =item ["Key"]
 
-Indicates that the elements are the keys itself. This is the default if no
+Indicates that the elements are the keys themselves. This is the default if no
 elements option is provided. So the constructor in the previous example could
 also have been written as:
 
@@ -502,8 +538,9 @@ Example:
 =item X<min_key>$min_key = $heap->min_key
 
 Looks for the lowest key in the heap and returns its value. Returns the highest
-possible value (infinity) in case the heap is empty. This method does not
-exist for heap types whose keys have no highest value (like order => "lt").
+possible value (the infinity for the chosen order) in case the heap is empty. 
+This method does not exist for heap types whose keys have no (repesentable) 
+highest value (like order => "lt").
 
 Example:
 
@@ -516,7 +553,7 @@ Example:
 
 =item X<count>$count = $heap->count
 
-Returns the number of entries in the heap.
+Returns the number of elements in the heap.
 
     use Heap::Simple;
 
