@@ -7,10 +7,14 @@ lib/Heap/Simple/Number.pm
 lib/Heap/Simple/NumberReverse.pm
 lib/Heap/Simple/String.pm
 lib/Heap/Simple/StringReverse.pm
+lib/Heap/Simple/Less.pm
 lib/Heap/Simple/Key.pm
 lib/Heap/Simple/Array.pm
 lib/Heap/Simple/Hash.pm
 lib/Heap/Simple/Method.pm
+lib/Heap/Simple/Object.pm
 lib/Heap/Simple/Function.pm
+lib/Heap/Simple/Any.pm
+lib/Heap/Simple/Wrapper.pm
 t/1.t
 t/s.t

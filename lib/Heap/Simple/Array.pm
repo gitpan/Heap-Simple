@@ -1,5 +1,5 @@
 package Heap::Simple::Array;
-$VERSION = "0.01";
+$VERSION = "0.02";
 use strict;
 use Carp;
 
@@ -15,7 +15,11 @@ sub _elements {
 }
 
 sub _KEY {
-    return "$_[1] ->[$_[0][0][2]]";
+    return $_[1] . "->[$_[0][0][2]]";
+}
+
+sub _QUICK_KEY {
+    return $_[1] . "->[\$self->[0][2]]"
 }
 
 sub key_index {
@@ -24,6 +28,10 @@ sub key_index {
     return $self->[0][2];
 }");
     return $self->key_index(@_);
+}
+
+sub key {
+    return $_[1]->[$_[0][0][2]];
 }
 
 1;

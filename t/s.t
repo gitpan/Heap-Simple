@@ -23,19 +23,39 @@ sub mark {
     print STDERR "------\n";
 }
 
-# Calibrate perl speed
-my $calibrate = 5;
-my $from = time;
+my $f_heap   = !$cachegrind && eval '
+          use Heap::Fibonacci; 
+          use Heap::Elem::Num qw(NumElem); 
+          use Heap::Elem::Str qw(StrElem);
+          1';
+my $b_heap = !$cachegrind && eval '
+          use Heap::Binary; 
+          use Heap::Elem::Num qw(NumElem); 
+          use Heap::Elem::Str qw(StrElem);
+          1';
+my $p_heap = !$cachegrind && eval '
+          use Heap::Priority; 
+          1';
+
 print STDERR "\n";
-mark();
-print STDERR "Calibrating. Should take about $calibrate seconds\n";
-1 while $from == time;
-$from = $calibrate+time;
-do {
-    $i++ for 1..10000;
-} while $from > time;
-my $Size = int($i/$calibrate/24);
-$Size =~ s/\B./0/g;
+my $Size;
+my $calibrate = 5;
+if ($cachegrind) {
+    $Size = 10000;
+} else {
+    # Calibrate perl speed
+    my $from = time;
+    mark();
+    print STDERR "Calibrating. Should take about $calibrate seconds\n";
+    1 while $from == time;
+    $from = $calibrate+time;
+    do {
+        $i++ for 1..10000;
+    } while $from > time;
+    $Size = int($i/$calibrate/24);
+    $Size *= 5 if !$b_heap && !$f_heap && !$p_heap;
+    $Size =~ s/\B./0/g;
+}
 
 for my $string (0) {
     my $order = $string ? "lt" : "<";
@@ -44,20 +64,12 @@ for my $string (0) {
     my $h_heap   = !$cachegrind && 
       Heap::Simple->new(elements => [Hash => "foo"], order => $order);
     my $num_heap = !$cachegrind && Heap::Simple->new(order => $order);
-    my $f_heap   = !$cachegrind && eval '
-          use Heap::Fibonacci; 
-          use Heap::Elem::Num qw(NumElem); 
-          use Heap::Elem::Str qw(StrElem);
-          Heap::Fibonacci->new';
-    my $b_heap = !$cachegrind && eval '
-          use Heap::Binary; 
-          use Heap::Elem::Num qw(NumElem); 
-          use Heap::Elem::Str qw(StrElem);
-          Heap::Binary->new';
-    my $p_heap;
-    eval 'use Heap::Priority; 
-          $p_heap = Heap::Priority->new; 
-          $p_heap->lowest_first' unless $cachegrind;
+    $f_heap = Heap::Fibonacci->new if $f_heap;
+    $b_heap = Heap::Binary->new if $b_heap;
+    if ($p_heap) {
+        $p_heap = Heap::Priority->new; 
+        $p_heap->lowest_first;
+    }
 
     my @array = map int(rand(2*$Size)), 1..$Size;
     # Only do few priority levels, or it's unfair to Heap::Priority

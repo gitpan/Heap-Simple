@@ -1,5 +1,5 @@
 package Heap::Simple::Hash;
-$VERSION = "0.02";
+$VERSION = "0.03";
 use strict;
 use Carp;
 
@@ -11,33 +11,24 @@ sub _elements {
     return $name;
 }
 
-sub _PREPARE {
+sub _ELEMENTS_PREPARE {
     return "my \$name = \$self->[0][2];";
 }
 
 sub _KEY {
-    return "$_[1] ->{\$name}";
+    return $_[1] . "->{\$name}";
 }
 
-sub min_key {
-    my $self = shift;
-    croak "min_key not supported (no infinity) on ", ref($self) unless
-        $self->can("_INF");
-    $self->_make('sub {
-        my $self = shift;
-    return @$self > 1 ? $self->[1]{$self->[0][2]} : _INF()
-}');
-    return $self->min_key(@_);
-}
-
-sub first_key {
-    my $self = shift;
-    return if @$self <= 1;	# avoid autovivify
-    return $self->[1]{$self->[0][2]};
+sub _QUICK_KEY {
+    return $_[1] . "->{\$self->[0][2]}"
 }
 
 sub key_name {
     return shift->[0][2];
+}
+
+sub key {
+    return $_[1]->{$_[0][0][2]};
 }
 
 1;

@@ -1,6 +1,18 @@
 Revision history for Perl extension Heap::Simple.
 
-0.02  Thu May 15 22:03:06 2003
+0.03  Sun May 19
+        - Added settable infinity
+        - Added generic compare function
+        - min_key now always exists, but can fail on empty heaps
+        - reordered $self->[0] from most to least likely
+        - Added the Object and Any element methods
+        - Added testcases for element methods Method, Object, Function and Any
+        - Added method "key_insert"
+        - Added testcases for generic compare
+        - Added method "key"
+        - Documented all new stuff
+        - Reduce the number of tests. Still way too many though.
+0.02  Thu May 15
         - Added testcases for > and gt
         - Cleaned up the tests a bit
         - Do a bit less work in the tests (faster)
@@ -10,7 +22,7 @@ Revision history for Perl extension Heap::Simple.
         - changed the macro-expander so it supports balanced parenthesis
         - Added the Method and Function element types for completely general
           key fetching (not documented or tested yet)
-0.01  Wed May 14 16:59:09 2003
+0.01  Wed May 14
 	- original version; created by h2xs 1.22 with options
 		-X -n Heap::Simple
         - Insert code from my old FastHeap module

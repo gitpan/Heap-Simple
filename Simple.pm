@@ -3,7 +3,7 @@ use strict;
 use Carp;
 
 use vars qw($VERSION $auto %used);
-$VERSION = "0.02";
+$VERSION = "0.03";
 $auto = "Auto";
 %used = ();
 
@@ -18,22 +18,30 @@ sub _use {
     return require "Heap/Simple/$name.pm";
 }
 
-my %order = (""   => "Number",	# Default
-            "<"	 => "Number",
+my %order = ("<" => "Number",
             ">"	 => "NumberReverse",
             "lt" => "String",
             "gt" => "StringReverse",
              );
 sub _order {
-    my $order = $order{defined($_[1]) ? $_[1] : ""} ||
-        croak "Unsupported order '$_[1]'";
-    $used{$order} ||= _use($order);
-    return $order;
+    my ($self, $order) = @_;
+    # Default order if nothing specified
+    $order = "<" unless defined($order) && $order ne "";
+    my $name;
+    if (ref($order) eq "CODE") {
+        $self->[0][3] = $order;
+        $name = "Less";
+    } else {
+        $name = $order{$order} || croak "Unsupported order '$order'";
+    }
+    $used{$name} ||= _use($name);
+    return $name;
 }
 
 sub _elements {
     my ($self, $elements) = @_;
     $elements = ["Key"] unless defined($elements);
+    $elements = [$elements] if ref($elements) eq "";
     croak "option elements is not an array reference" unless
         ref($elements) eq "ARRAY";
     croak "option elements has no type defined at index 0" unless
@@ -51,24 +59,53 @@ sub new {
     # note: the array starts at elements 1 to make the subscripting
     # operations (much!) cleaner.
     # So elements 0 is used for associated data
-    my $self = bless [[undef, $options{user_data}]], $class;
+    my $self = bless [[]], $class;
     # We temporarily bless $self into $class so you can play OO games with it
-    my $order   = $self->_order($options{order});
+    my @order    = $self->_order($options{order});
     my @elements = $self->_elements($options{elements});
-    my $gclass = join("::", $class, $auto, $order, @elements);
+    my $gclass = join("::", $class, $auto, @order, @elements);
     no strict "refs";
     @{"${gclass}::ISA"} = (__PACKAGE__ . "::$elements[0]",
-                           __PACKAGE__ . "::$order",
+                           __PACKAGE__ . "::$order[0]",
                            $class) unless @{"${gclass}::ISA"};
+    print STDERR "Generated class $gclass\n" if DEBUG;
     # Now rebless the result in its final generated class
     bless $self, $gclass;
-    print STDERR "Generated class $gclass\n" if DEBUG;
+    $self->[0][1] = exists($options{infinity}) ?
+        $options{infinity} : $self->_INF;
+    $self->[0][4] = $options{user_data} if defined($options{user_data});
     $self->_init(\%options);
     return $self;
 }
 
+sub _ELEMENTS_PREPARE {
+    wantarray ? () : "";
+}
+
+sub _ORDER_PREPARE {
+    wantarray ? () : "";
+}
+
 sub _PREPARE {
-    return "";
+    my $self = shift;
+    join(";", $self->_ORDER_PREPARE, $self->_ELEMENTS_PREPARE);
+}
+
+sub _VALUE {
+    return $_[1];
+}
+
+sub _WRAPPER {
+    return $_[2];
+}
+
+sub _INF {
+    return;
+}
+
+sub _MAKE_KEY {
+    my ($self, $key, $value) = @_;
+    return "$key " . $self->_KEY($value);
 }
 
 my $balanced;
@@ -93,10 +130,6 @@ sub _make {
     die $@ if $@;
 }
 
-sub first {
-    return shift->[1];
-}
-
 sub count {
     return @{+shift}-1;
 }
@@ -110,6 +143,7 @@ sub insert {
     if ($self->_KEY("") eq "") {
         $self->_make('sub {
     my ($self, $key) = @_;
+    _ORDER_PREPARE()
     my $i = @$self;
     $i = $i >> 1 while $i > 1 && _SMALLER($key, ($self->[$i] = $self->[$i >> 1]));
     $self->[$i] = $key}');
@@ -117,11 +151,11 @@ sub insert {
         $self->_make('sub {
     my ($self, $value) = @_;
     _PREPARE()
-    my $key = _KEY($value);
+    _MAKE_KEY(my $key =, $value);
     my $i = @$self;
     $i = $i >> 1 while
         $i > 1 && _SMALLER($key, _KEY(($self->[$i] = $self->[$i >> 1])));
-    $self->[$i] = $value}');
+    $self->[$i] = _WRAPPER($key, $value)}');
     }
     $self->insert(@_);
 }
@@ -144,10 +178,10 @@ sub extract_min {
     $self->_make('sub {
     my $self = shift;
     if (@$self <= 2) {
-        return pop(@$self) if @$self == 2;
+        return _VALUE(pop(@$self)) if @$self == 2;
         croak "heap underflow";
     }
-    my $min = $self->[1];
+    my $min = _VALUE($self->[1]);
     _PREPARE()
     my $key = _KEY($self->[-1]);
     my $n = @$self-2;
@@ -180,32 +214,87 @@ sub extract_min {
     $self->extract_min(@_);
 }
 
-# Often worth overriding
 sub min_key {
     my $self = shift;
-    croak "min_key not supported (no infinity) on ", ref($self) unless
-        $self->can("_INF");
-    $self->_make('sub {
+    if ($self->can("_QUICK_KEY")) {
+        $self->_make('sub {
     my $self = shift;
-    _PREPARE()
-    return @$self > 1 ? _KEY($self->[1]) : _INF()
+    return @$self > 1 ? _QUICK_KEY($self->[1]) :
+        defined($self->[0][1]) ? $self->[0][1] : croak "Heap empty"
 }');
+    } else {
+        $self->_make('sub {
+    my $self = shift;
+    return defined($self->[0][1]) ? $self->[0][1] : croak "Heap empty" if
+        @$self <= 1;
+    _ELEMENTS_PREPARE()
+    return _KEY($self->[1])
+}');
+    }
     $self->min_key(@_);
 }
 
-# Often worth overriding
 sub first_key {
     my $self = shift;
+    if ($self->can("_QUICK_KEY")) {
     $self->_make('sub {
         my $self = shift;
     return if @$self <= 1;	# avoid autovivify
-    _PREPARE()
+    return _QUICK_KEY($self->[1])
+}');
+    } else {
+    $self->_make('sub {
+        my $self = shift;
+    return if @$self <= 1;	# avoid autovivify
+    _ELEMENTS_PREPARE()
     return _KEY($self->[1])
 }');
+    }
     return $self->first_key(@_);
 }
 
+sub first {
+    my $self = shift;
+    if ($self->_VALUE("") eq "") {
+        $self->_make('sub {
+    return shift->[1]
+}');
+    } else {
+        $self->_make('sub {
+    my $self = shift;
+    return if @$self <= 1;	# avoid autovivify
+    return _VALUE($self->[1])
+}');
+    }
+    return $self->first(@_);
+}
+
+# This code is pretty weak. Often best to override for the mement
+sub key {
+    my $self = shift;
+    if ($self->_KEY("") eq "") {
+        $self->_make('sub {
+    return $_[1]}');
+    } else {
+        $self->_make('sub {
+    my $self = shift;
+    return _QUICK_KEY(shift)
+}');
+    }
+    return $self->key(@_);
+}
+
 sub user_data {
+    if (@_ > 1) {
+        my $self = shift;
+        my $old = $self->[0][4];
+        $self->[0][4] = shift;
+        return $old;
+    }
+    return shift->[0][4];
+}
+
+sub infinity {
     if (@_ > 1) {
         my $self = shift;
         my $old = $self->[0][1];
@@ -215,10 +304,9 @@ sub user_data {
     return shift->[0][1];
 }
 
-
 =head1 NAME
 
-Heap::Simple - A fast and simple classic heaps
+Heap::Simple - Fast and easy to use classic heaps
 
 =head1 SYNOPSIS
 
@@ -228,8 +316,10 @@ Heap::Simple - A fast and simple classic heaps
     my $heap = Heap::Simple;
     my $heap = Heap::Simple->new(%options);
 
-    # Put data in the hash
+    # Put data in the heap
     $heap->insert($element);
+    # Put data in a "Object" or "Any" heap with a given key
+    $heap->key_insert($key, $element);
 
     # Extract data
     $element = $heap->extract_min;
@@ -240,20 +330,29 @@ Heap::Simple - A fast and simple classic heaps
     # Look which data is first without extracting
     $element = $heap->first;
 
-    # Find the lowest value in the hep
+    # Find the lowest value in the heap
     $min_key = $heap->first_key;  # returns undef   on an empty heap
     $min_key = $heap->min_key;	  # return infinity on an empty heap
 
     # Find the number of elements
     $count = $heap->count;
 
+    # Find the key corresponding to a value
+    $key = $heap->key($value);
+
     # Get/Set user_data
-    $user_data = $heap->user_data;
-    $old_data  = $heap->user_data($new_data);
+    $user_data  = $heap->user_data;
+    $old_data   = $heap->user_data($new_data);
+
+    # Get/Set infinity
+    $infinity     = $heap->infinity;
+    $old_infinity = $heap->infinity($new_data);
 
     # Get the position of a key in an element
-    $key_index = $heap->key_index;
-    $key_name  = $heap->key_name;
+    $key_index    = $heap->key_index;
+    $key_name     = $heap->key_name;
+    $key_method   = $heap->key_method;
+    $key_function = $heap->key_function;
 
 =head1 DESCRIPTION
 
@@ -328,12 +427,14 @@ used:
 
 and the result would have been exactly the same.
 
-=item E<lt>
+The default infinity for this order is +inf.
+
+=item E<gt>
 
 Indicates that keys are compared as numbers, and extraction is highest value
-first. This means that methods like L<extract_min|"extract_min"> become 
+first. This means that methods like L<extract_min|"extract_min"> become
 rather confusing in name, since they extract the maximum in the sense of
-the numeric value (but it's still the smallest value in terms of the 
+the numeric value (but it's still the smallest value in terms of the
 abstract order relation).
 
 Repeating the example with this order gives:
@@ -345,6 +446,8 @@ Repeating the example with this order gives:
     print $heap->extract_min, " " for 1..$heap->count;
     print "\n";
     # Will print: 14 8 3 3 -1
+
+The default infinity for this order is -inf.
 
 =item lt
 
@@ -361,6 +464,8 @@ value first. So we could modify the "<" example to:
 
 Notice how 14 comes before 3 as you would expect in lexical sorting.
 
+The default infinity for this order is "undef" (there is no maximum string)
+
 =item gt
 
 Indicates that the keys are compared as strings, and extraction is highest
@@ -375,6 +480,69 @@ The standard example now becomes:
     print "\n";
     # Will print: zzzz ate at 8 3 3 14 -1
 
+The default infinity for this order is "" (the empty string)
+
+=item $code_reference
+
+If your keys are completely weird things, neither numbers nor strings and you
+need a special compare function, you can use this general ordering type.
+
+Every time two keys need to be compared, the given code reference will be
+called like:
+
+    $less = $code_reference($key1, $key2);
+
+This should return a true value if $key1 is smaller than $key2 and a false
+value otherwise (actually, since the order of equal elements is unspecified,
+it's ok to return true in case of equality too). $code_reference should
+imply a total order relation, so it needs to be transitive.
+
+Since in this case nothing can be determined about the key type, there will
+be no infinity by default (even if the keys are numbers).
+
+Example:
+
+    use Heap::Simple;
+
+    sub more { return $_[0] > $_[1] }
+
+    my $heap = Heap::Simple->new(order => \&more);
+    $heap->insert($_) for 8, 3, 14, -1, 3;
+    print $heap->extract_min, " " for 1..$heap->count;
+    print "\n";
+    # Will print: 14 8 3 3 -1
+
+The code reference will be called many times during normal heap operations
+(O(log n) times for a single insert or extract on a size n heap), so only use
+this order type within reason. Usually it's better to precalculate some number 
+or string representation of some sort of key and use normal compares on these.
+You can use the L<Any element type|"Any"> and L<key_insert|"key_insert"> to 
+wrap the precalculated key with the corresponding element, or you can delegate
+the key calculation to the L<insert|"insert"> method and use one of the
+L<Method|"Method">, L<Object|"Object"> or L<Function|"Function"> element types.
+
+Here's a slightly more complex example, sorting mixed strings:
+
+    use Heap::Simple;
+
+    sub key {
+        my $str = uc(shift);
+        $str =~ s|(0*)(\d+)|pack("AN/A*N", "0", $2, length($1))|eg;
+        return $str;
+    }
+       
+    my $heap = Heap::Simple->new(order => "lt",
+                                 elements => [Function => \&key]);
+    $heap->insert($_) for qw(Athens5.gr Athens40.gr
+                             Amsterdam51.nl Amsterdam5.nl amsterdam20.nl);
+    print $heap->extract_min, "\n" for 1..$heap->count;
+    # This will print:
+    Amsterdam5.nl
+    amsterdam20.nl
+    Amsterdam51.nl
+    Athens5.gr
+    Athens40.gr
+
 =back
 
 =item X<elements>elements => $element_type
@@ -383,20 +551,33 @@ This option describes what sort of elements we will store in the heap.
 The only reason the module needs to know this is to determine how to access
 the key values.
 
+The $element_type is usually an array reference, but if the array has only
+one entry, you may use that directly. So you can use:
+
+    elements => "Array"
+
+instead of:
+
+    elements => ["Array"]
+
 The following element types are currently supported:
 
 =over 2
 
-=item ["Key"]
+=item X<Key>["Key"]
 
 Indicates that the elements are the keys themselves. This is the default if no
 elements option is provided. So the constructor in the previous example could
 also have been written as:
 
-    my $heap = Heap::Simple->new(order => "lt", 
+    my $heap = Heap::Simple->new(order => "lt",
                                  elements => ["Key"]);
 
-=item [Array => $index]
+or in the simplified notation:
+
+    my $heap = Heap::Simple->new(order => "lt", elements => "Key");
+
+=item X<Array>[Array => $index]
 
 Indicates that the elements are array references, with the key at index $index.
 So now the element can be not just the key, but also associated data. We can
@@ -404,7 +585,7 @@ use this to for example print the values of a hash ordered by key:
 
     use Heap::Simple;
 
-    my $heap = Heap::Simple->new(order => "lt", 
+    my $heap = Heap::Simple->new(order => "lt",
                                  elements => [Array => 0]);
     while (my ($key, $val) = each %hash) {
         $heap->insert([$key, $val]);
@@ -418,8 +599,13 @@ so the "Array" element type is rather generally useful. Since it's so common
 to put the key in the first position, you may in fact drop the index in that
 case, so the constructor in the previous example could also be written as:
 
-    my $heap = Heap::Simple->new(order => "lt", 
+    my $heap = Heap::Simple->new(order => "lt",
                                  elements => ["Array"]);
+
+or using the one element rule:
+
+    my $heap = Heap::Simple->new(order => "lt",
+                                 elements => "Array");
 
 In case the elements you want to store are array (or array based objects
 (or L<fields based objects|fields>) and you are prepared to break the object
@@ -430,7 +616,7 @@ on which you want to order is a number at position 4, you could use:
     print "The key is $object->[4]\n";
     $heap->insert($object);
 
-=item [Hash => $key_name]
+=item X<Hash>[Hash => $key_name]
 
 Indicates that the elements are hash references, where the key (for the heap
 element) is the value $element->{$key_name} .
@@ -439,7 +625,7 @@ Redoing the Array example in Hash style gives:
 
     use Heap::Simple;
 
-    my $heap = Heap::Simple->new(order => "lt", 
+    my $heap = Heap::Simple->new(order => "lt",
                                  elements => [Hash => "tag"]);
     while (my ($key, $val) = each %hash) {
         $heap->insert({tag => $key, value => $val});
@@ -457,6 +643,107 @@ with key "price", you could use:
     print "The key is $object->{price}\n";
     $heap->insert($object);
 
+=item X<Method>[Method => $method_name]
+
+In case you don't want to (or can't) break the object encapsulation, but there
+is a method that will return the key for a given object, you can use this.
+
+The method method_name will be called like:
+
+    $key = $element->$method_name();
+
+and should return the key corresponding to $element.
+
+Suppose that the elements are objects whose weight you can access using the
+"weight" method. A heap ordered on weight then becomes:
+
+    my $heap = Heap::Simple->new(elements => [Method => "weight"]);
+    print "The key is ", $object->weight(), "\n";
+    $heap->insert($object);
+
+=item X<Object>[Object => $method_name]
+
+The drawback of the L<"Method" element type|"Method"> is that the method will
+be called every time the internals need ordering information, which will be
+O(log n) for a single insert or extract on a heap of size n. So it's usually
+better to first extract the key before insert, wrap the object with the key
+such that key access is cheap and insert that. Since this is so common,
+this element type is provided for that.
+
+So this element type will only call $method_name once on the initial insert,
+after which internally the key is entered together with the value. This makes
+it faster, but it also uses more memory.
+
+It also means that it's now perfectly fine to make changes to the object
+that change the key while it is in the heap. This will have absolutely no
+influence on the ordering anymore, and methods like L<first_key|"first_key">
+will return what the key value was at insert time.
+
+Repeating the previous example in this style is a trivial variation:
+
+    my $heap = Heap::Simple->new(elements => [Object => "weight"]);
+    print "The key is ", $object->weight(), "\n";
+    $heap->insert($object);
+
+Since for this element type the key is almost completely decoupled from the
+value and only fetched on insert, it often makes sense to not let the heap
+calculate the key, but do it yourself before the insert, and then use
+L<key_insert|"key_insert">. In fact, if you never use plain L<insert|"insert">
+at all, you don't even have to bother passing a method name (though in that
+case the fact that the thing you store is an object is pretty irrelevant and
+it's probable more natural to use the L<Any element type|"Any">.
+
+=item X<Function>[Function => $code_reference]
+
+For completely general key calculation you can use this element type. The given
+code reference will be called on an element like:
+
+    $key = $code_reference->($element);
+
+and should return the key corresponding to $element.
+
+An example:
+
+    sub price {
+        my $items = shift;
+        my $price = 0;
+        $price += $_->price for @$items;
+    }
+
+    my $heap = Heap::Simple->new(elements => [Function => \&price]);
+    print "All items together will cost ", $item_list->price, "\n";
+    $heap->insert($item_list);
+
+=item X<Any>[Any => $code_reference]
+
+The same discussion as under L<Object|"Object"> applies for
+L<Function|"Function">: single insert and extract on a size n heap will call
+the code reference O(log n) times, which could be get slow.
+
+So if you are prepared to use more memory, you can again tell Heap::Simple
+to calculate the key already at insert time, and store it together with the
+value. This will avoid the need for repeated key calculations.
+
+The "Any" element type will do this for you transparantly.
+
+The heap part of the above example becomes:
+
+    my $heap = Heap::Simple->new(elements => [Any => \&price]);
+    print "All items together will cost ", $item_list->price, "\n";
+    $heap->insert($item_list);
+
+Since for this element type the key is almost completely decoupled from the
+value and only fetched on insert, it often makes sense to not let the heap
+calculate the key, but do it yourself before the insert, and then use
+L<key_insert|"key_insert">. In fact, if you never use plain L<insert|"insert">
+at all, you don't even have to bother passing the code reference. So the last
+example could look like:
+
+    my $heap = Heap::Simple->new(elements => "Any");
+    my $price = $item_list->price;
+    print "All items together will cost $price\n";
+    $heap->key_insert($price, $item_list);
+
 =back
 
 =item user_data => $user_data
@@ -471,12 +758,37 @@ If this option is not given, the heap starts with "undef" associated to it.
     print $heap->user_data, "\n";
     # prints foo
 
+=item infinity => $infinity
+
+Associates $infinity as the highest possible key with the created heap.
+($infinity may or may not be a possible key itself).
+Setting it to "undef" means there is no infinity associated with the heap.
+
+The default value depends on the L<order|"order"> relation that was
+specified.
+
+Usually you can just forget about this option. Only L<min_key|"min_key">
+really cares.
+
 =back
+
+Notice that the class into which the resulting heap is blessed will B<not>
+be Heap::Simple. It will be an on demand generated class that will have
+Heap::Simple as an ancestor.
 
 =item X<insert>$heap->insert($element)
 
 Inserts the $element in the heap. On extraction you get back exactly the same
-$array_ref as you inserted, including a possible L<blessing|perlfunc/"bless">.
+$element as you inserted, including a possible L<blessing|perlfunc/"bless">.
+
+=item X<key_insert>$heap->key_insert($key, $element)
+
+Inserts the $element in the heap ordered by the given $key. Since in this case
+the key must be stored seperately from the element, this only works for
+L<"Object"|"Object"> and L<"Any"|"Any"> heaps.
+
+On extraction you get back exactly the same $element as you inserted,
+including a possible L<blessing|perlfunc/"bless">.
 
 =item X<extract_min>$element = $heap->extract_min
 
@@ -538,9 +850,8 @@ Example:
 =item X<min_key>$min_key = $heap->min_key
 
 Looks for the lowest key in the heap and returns its value. Returns the highest
-possible value (the infinity for the chosen order) in case the heap is empty. 
-This method does not exist for heap types whose keys have no (repesentable) 
-highest value (like order => "lt").
+possible value (the infinity for the chosen order) in case the heap is empty.
+If there is no infinity, it will throw an exception.
 
 Example:
 
@@ -550,6 +861,12 @@ Example:
     $heap->insert($_) for 8, 3, 14, -1, 3;
     print $heap->min_key, "\n";
     # prints -1
+
+=item X<key>$key = $heap->key($value)
+
+Calculates the key corresponding to $value in the same way as the internals
+of $heap would. Can fail for L<Object|"Object"> and L<Any|"Any"> element
+types if there was no method or function given on heap creation.
 
 =item X<count>$count = $heap->count
 
@@ -570,15 +887,34 @@ Queries the user_data associated with the heap.
 
 Associates new user_data with the heap. Returns the old value.
 
+=item X<infinity>$infinity = $heap->infinity
+
+Queries the infinity value associated with the heap. Returns undef if there
+is none. The default infinity is implied by the chosen order relation.
+
+=item $old_infinity = $heap->user_data($new_infinity)
+
+Associates a new infinity with the heap. Returns the old value.
+
 =item $key_index = $heap->key_index
 
-Returns the index of the key for array reference based heaps. Doesn't exist
-for the other heap types.
+Returns the index of the key for L<array reference based heaps|"Array">.
+Doesn't exist for the other heap types.
 
 =item $key_name = $heap->key_name
 
-Returns the name of the key key for hash reference based heaps. Doesn't exist
-for the other heap types.
+Returns the name of the key key for L<hash reference based heaps|"Hash">.
+Doesn't exist for the other heap types.
+
+=item $key_name = $heap->key_method
+
+Returns the name of the method to fetch the key from an object. Only exists
+for L<Method|"Method"> and L<Object|"Object"> based heaps.
+
+=item $key_function = $heap->key_function
+
+Returns the code reference of the function to fetch the key from an element.
+Only exists for L<"Function"|"Function"> and L<"Any"|"Any"> heaps.
 
 =back
 

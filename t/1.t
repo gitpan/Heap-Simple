@@ -4,26 +4,46 @@
 use warnings;
 use strict;
 
-use Test::More tests => 3574;
+use Test::More tests => 5461;
 BEGIN { $^W = 1 };
 BEGIN { use_ok("Heap::Simple") };
 
-sub check_empty {
-    my ($heap, $order) = @_;
-    is($heap->count, 0, "Empty heap has count 0");
-    is($heap->first, undef, "Empty heap gives undef");
-    is($heap->first_key, undef, "First key returns undef on empty heap");
-    my @expect = (1e300000, -1e300000, undef, "");
-    my $val = eval { $heap->min_key };
-    if (defined($expect[$order])) {
-        is($val, $expect[$order], "Min key returns '$expect[$order]' on empty heap");
-    } else {
-        ok($@, "min_key should not exist");
+my ($index, $basic, $order, $eorder);
+my @infinity = (1e300000, -1e300000, undef, "", undef, "ABCD");
+
+sub order {
+    return $_[0] > $_[1];
+}
+
+my $key_lookup;
+sub lookup {
+    $key_lookup ||= $_[0] || "a";
+    return shift->{look};
+}
+
+{
+    package Wombat;
+    sub meth {
+        $key_lookup ||= $_[0] || "a";;
+        return shift->{method};
     }
 }
 
-my $index;
-my $basic;
+sub check_empty {
+    my $heap = shift;
+    is($heap->count, 0, "Empty heap has count 0");
+    is($heap->first, undef, "Empty heap gives undef");
+    is($heap->first_key, undef, "First key returns undef on empty heap");
+    my $expect = $heap->infinity;
+    is($expect, $infinity[$eorder+1], "Still the infinity we set");
+    my $val = eval { $heap->min_key };
+    if (defined($expect)) {
+        is($val, $expect, "Min key returns '$expect' on empty heap");
+    } else {
+        ok($@, "min_key should fail");
+    }
+}
+
 sub make {
     my ($key, $value) = @_;
     if ($index) {
@@ -56,34 +76,73 @@ sub value {
     } @_;
 }
 
-my @order = (map [order => $_], qw(< > lt gt));
-for my $order (-1..$#order) {
-    my %order = $order == -1 ? () : @{$order[$order]};
-    $order = 0 if $order == -1;	# Expect the default
-    for ([],
-         ["Key"],
-         ["Array"],
-         ["Array", 0],
-         ["Array", 1],
-         ["Hash", "baz"]) {
-        $index = $_->[1];
+# Check equivalences
+my $heap1 = Heap::Simple->new();
+my $heap2 = Heap::Simple->new(elements => ["Key"]);
+is(ref($heap1), ref($heap2), "Default is element type Key");
+$heap2 = Heap::Simple->new(elements => "Key");
+is(ref($heap1), ref($heap2), "Short form of Key");
+$heap2 = Heap::Simple->new(order => "<");
+is(ref($heap1), ref($heap2), "Default order is <");
+
+$heap1 = Heap::Simple->new(elements => [Array => 0]);
+$heap2 = Heap::Simple->new(elements => ["Array"]);
+is(ref($heap1), ref($heap2), "Default is array index is 0");
+$heap2 = Heap::Simple->new(elements => "Array");
+is(ref($heap1), ref($heap2), "Short form of Array");
+
+my @order = qw(< > lt gt);
+for (-1..$#order) {
+    my %order = (order => $_ == -1 ? \&order : $order[$_]);
+    $order = $_ == -1 ? 1 : $_;
+    $eorder = $_ == -1 ? @order : $order;
+    for (
+         [],
+         [Array	=> 0],
+         [Array	=> 1],
+         [Hash	=> "baz"],
+         [Method => "meth"],
+         [Object => "meth"],
+         [Function => \&lookup],
+         [Any	=> \&lookup],
+) {
         my %elements = @$_ ? (elements => $_) : ();
+        my $key_insert = $_->[0] && ($_->[0] eq "Object" || $_->[0] eq "Any");
+        $index = $_->[1];
+        $index = "method" if $index && $index eq "meth";
+        $index = "look" if ref($index);
 
         # new & user_data
         my $empty_heap = Heap::Simple->new(%order, %elements);
+
+        is($empty_heap->infinity, $infinity[$eorder], "Right infinity");
+        is($empty_heap->infinity($infinity[$eorder+1]), $infinity[$eorder],
+           "infinity set returns old value");
+        is($empty_heap->infinity, $infinity[$eorder+1], "Right infinity");
+        
         isa_ok($empty_heap, "Heap::Simple", "new creates Heap::Simple");
         my @expect = qw(Heap::Simple::Number Heap::Simple::NumberReverse
-                      Heap::Simple::String Heap::Simple::StringReverse);
-        isa_ok($empty_heap, $expect[$order], "right superclass");
-        check_empty($empty_heap, $order);
+                      Heap::Simple::String Heap::Simple::StringReverse
+                      Heap::Simple::Less);
+        for (0..$#expect) {
+            if ($_ == $eorder) {
+                isa_ok($empty_heap, $expect[$_], "right superclass");
+            } else {
+                ok(!$empty_heap->isa($expect[$_]), "not the wrong superclass");
+            }
+        }
+        check_empty($empty_heap);
         is($empty_heap->user_data, undef, "Default userdata is undef");
         is($empty_heap->user_data("foo"), undef, "userdata set returns old value");
         is($empty_heap->user_data, "foo", "Userdata set works");
-        check_empty($empty_heap, $order);
+        check_empty($empty_heap);
 
         my $heap = Heap::Simple->new(%order, %elements, user_data => "bar");
-        check_empty($heap, $order);
-        is($heap->user_data, "bar", "Initial userdata is survives");
+        # Got the right default infinity
+        is($heap->infinity($infinity[$eorder+1]), $infinity[$eorder],
+           "infinity set returns old value");
+
+        check_empty($heap);
 
         # We'll insert each entry as key with the follower as value
         my @keys = (14, 8, 1, -12, 16, 10, 15, -11, 13, 10, 9, -1);
@@ -92,7 +151,19 @@ for my $order (-1..$#order) {
 
         # Do everything 2 times to see if looping screws things up
         for (1..2) {
-            check_empty($heap, $order);
+            check_empty($heap);
+            if ($heap->isa("Heap::Simple::Method")) {
+                is($heap->key_method, "meth", "Key method meth");
+            } else {
+                my $fail = eval { $heap->key_method };
+                ok($@, "There is no key_method");
+            }
+            if ($heap->isa("Heap::Simple::Function")) {
+                is($heap->key_function, \&lookup, "Key function lookup");
+            } else {
+                my $fail = eval { $heap->key_function };
+                ok($@, "There is no key_method");
+            }
             if ($heap->isa("Heap::Simple::Hash")) {
                 is($heap->key_name, $index, "Key is at position $index");
             } else {
@@ -111,7 +182,6 @@ for my $order (-1..$#order) {
                 $heap->insert(make($keys[$i-1], $keys[$i]));
                 is($heap->count, $i, "Count keeps up");
             }
-            is($heap->user_data, "bar", "Inserting leaves user_data alone");
 
             # extract_min
             my $ref = $heap->extract_min;
@@ -119,7 +189,6 @@ for my $order (-1..$#order) {
             is($heap->count, @keys-1, "Count right after extract");
             @expect = value($heap, [-12, 16], [16, 10], ["A-1", undef], ["A9", "A-1"]);
             is_deeply($ref, $expect[$order], "We extract what we put in");
-            is($heap->user_data, "bar", "extract_min leaves user_data alone");
             $ref = eval { $empty_heap->extract_min };
             ok($@, "Extracting from empty heap dies");
 
@@ -150,17 +219,32 @@ for my $order (-1..$#order) {
             is_deeply(\@refs, [map $_->[$order], @expect]);
             is($heap->count, @keys-6);
 
-            is($heap->user_data, "bar", "extract_upto leaves user_data alone");
-
             @refs = $empty_heap->extract_upto(1e20);
             is(@refs, 0, "extract_upto on empty heap returns nothing");
+            is($empty_heap->infinity, $infinity[$eorder+1], "Right infinity");
 
-            # insert again for a bit of irregularity
-            for my $i (1..5) {
-                $heap->insert(make($keys[$i-1], $keys[$i]));
+            # insert again for a bit of irregularity, but now use key_insert
+            # if we have it.
+            if ($key_insert) {
+                my (@element, @key);
+                for my $i (1..5) {
+                    $element[$i] = make($keys[$i-1], $keys[$i]);
+                    $key[$i] = $heap->key($element[$i]);
+                }
+                $key_lookup = 0;
+                for my $i (1..5) {
+                    $heap->key_insert($key[$i], $element[$i]);
+                }
+                is($key_lookup, 0, "Internals never looked up key");
+            } else {
+                ok(!$heap->can("key_insert"), 
+                   "others don't even HAVE key_insert");
+                print STDERR "\n$heap has key_insert\n" if $heap->can("key_insert");
+                for my $i (1..5) {
+                    $heap->insert(make($keys[$i-1], $keys[$i]));
+                }
             }
             is($heap->count, @keys-1, "Count keeps up");
-            is($heap->user_data, "bar", "Inserting leaves user_data alone");
 
             # first
             $ref = $heap->first;
@@ -168,32 +252,32 @@ for my $order (-1..$#order) {
             is($heap->count, @keys-1, "Count right after first unchanged");
             @expect = value($heap, [-12, 16], [16, 10], ["A-12", "A16"], ["A8", "A1"]);
             is_deeply($ref, $expect[$order], "right values found");
-            is($heap->user_data, "bar", "First leaves user_data alone");
             # already checked on empty heap
 
             # first_key
             my $min = $heap->first_key;
             @expect = qw(-12 16 A-12 A8);
             is($min, $expect[$order], "Found first key");
-            is($heap->user_data, "bar", "First_key leaves user_data alone");
             is($heap->count, @keys-1, "Count keeps up");
             # already checked on empty heap
 
             # min_key
             $min = eval { $heap->min_key };
-            if ($order == 2) {
-                ok($@, "There is no min_key method");
-            } else {
-                is($@, "", "min_key works");
-                is($min, $expect[$order], "Found min key");
-                # already checked on empty heap
-            }
-            is($heap->user_data, "bar", "Min_key leaves user_data alone");
+            is($@, "", "min_key works");
+            is($min, $expect[$order], "Found min key");
             is($heap->count, @keys-1, "Count keeps up");
+
+            # key
+            is($heap->key($heap->first), $heap->first_key, 
+               "Recover key from element");
+
+            # Check if we still have the right associated data
+            is($heap->infinity, $infinity[$eorder+1], "Right infinity");
+            is($heap->user_data, "bar", "user_data survived everything");
 
             # Now drop all values
             $heap->extract_min for 1..$heap->count;
-            check_empty($heap, $order);
+            check_empty($heap);
 
             # Bigger stress test
             my $n = 5000;
@@ -205,7 +289,7 @@ for my $order (-1..$#order) {
                         $order == 3 ? (sort {$b cmp $a } @rand) :
                             die "Unhandled order $order";
             $heap->insert(make($_, "foo")) for @rand;
-            if ($heap->isa("Heap::Simple::Hash")) {
+            if ($index && $index =~ /[^\d-]/) {
                 @sorted = map $heap->extract_min->{$index}, @rand;
             } elsif ($basic) {
                 @sorted = map $heap->extract_min, @rand;
@@ -219,3 +303,4 @@ for my $order (-1..$#order) {
     my $fail = eval { Heap::Simple->new(%order, elements => ["Hash"]) };
     ok($@, "missing key_name should fail");
 }
+

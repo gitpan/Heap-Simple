@@ -1,5 +1,5 @@
-Heap::Simple version 0.02
-========================
+Heap::Simple
+============
 
 DESCRIPTION
 
@@ -30,8 +30,10 @@ SYNOPSIS
     my $heap = Heap::Simple;
     my $heap = Heap::Simple->new(%options);
 
-    # Put data in the hash
+    # Put data in the heap
     $heap->insert($element);
+    # Put data in a "Object" or "Any" heap with a given key
+    $heap->key_insert($key, $element);
 
     # Extract data
     $element = $heap->extract_min;
@@ -42,20 +44,29 @@ SYNOPSIS
     # Look which data is first without extracting
     $element = $heap->first;
 
-    # Find the lowest value in the hep
+    # Find the lowest value in the heap
     $min_key = $heap->first_key;  # returns undef   on an empty heap
     $min_key = $heap->min_key;	  # return infinity on an empty heap
+
+    # Find the key corresponding to a value
+    $key = $heap->key($value);
 
     # Find the number of elements
     $count = $heap->count;
 
     # Get/Set user_data
-    $user_data = $heap->user_data;
-    $old_data  = $heap->user_data($new_data);
+    $user_data  = $heap->user_data;
+    $old_data   = $heap->user_data($new_data);
+
+    # Get/Set infinity
+    $infinity     = $heap->infinity;
+    $old_infinity = $heap->infinity($new_data);
 
     # Get the position of a key in an element
-    $key_index = $heap->key_index;
-    $key_name  = $heap->key_name;
+    $key_index    = $heap->key_index;
+    $key_name     = $heap->key_name;
+    $key_method   = $heap->key_method;
+    $key_function = $heap->key_function;
 
 INSTALLATION
 

@@ -1,10 +1,6 @@
 package Heap::Simple::Key;
-$VERSION = "0.01";
+$VERSION = "0.02";
 use strict;
-
-sub _PREPARE {
-    return "";
-}
 
 sub _KEY {
     return $_[1];
