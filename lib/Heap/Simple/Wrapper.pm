@@ -1,9 +1,9 @@
 package Heap::Simple::Wrapper;
-$VERSION = "0.01";
+$VERSION = "0.02";
 use strict;
 
 sub _ELEMENTS_PREPARE {
-    wantarray ? () : "";
+    return "";
 }
 
 sub _QUICK_KEY {

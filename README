@@ -54,6 +54,14 @@ SYNOPSIS
     # Find the number of elements
     $count = $heap->count;
 
+    # Empty the heap
+    $heap->clear;
+
+    # Get all keys (not sorted)
+    @keys = $heap->keys;
+    # Get all values (not sorted)
+    @values = $heap->values;
+
     # Get/Set user_data
     $user_data  = $heap->user_data;
     $old_data   = $heap->user_data($new_data);

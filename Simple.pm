@@ -3,7 +3,7 @@ use strict;
 use Carp;
 
 use vars qw($VERSION $auto %used);
-$VERSION = "0.04";
+$VERSION = "0.05";
 $auto = "Auto";
 %used = ();
 
@@ -79,16 +79,16 @@ sub new {
 }
 
 sub _ELEMENTS_PREPARE {
-    wantarray ? () : "";
+    return "";
 }
 
 sub _ORDER_PREPARE {
-    wantarray ? () : "";
+    return "";
 }
 
 sub _PREPARE {
     my $self = shift;
-    join(";", $self->_ORDER_PREPARE, $self->_ELEMENTS_PREPARE);
+    return join("", $self->_ORDER_PREPARE, $self->_ELEMENTS_PREPARE);
 }
 
 sub _VALUE {
@@ -131,7 +131,11 @@ sub _make {
 }
 
 sub count {
-    return @{+shift}-1;
+    return $#{+shift};
+}
+
+sub clear {
+    $#{+shift} = 0;
 }
 
 1;
@@ -284,6 +288,35 @@ sub key {
     return $self->key(@_);
 }
 
+sub keys {
+    my $self = shift;
+    if($self->_KEY("") eq "") {
+        $self->_make('sub {
+    my $self = shift;
+    return @$self[1..$#$self]}');
+    } else {
+        $self->_make('sub {
+    my $self = shift;
+    _ELEMENTS_PREPARE()
+    return map _KEY($_), @$self[1..$#$self]}');
+    }
+    return $self->keys(@_);
+}
+
+sub values {
+    my $self = shift;
+    if($self->_VALUE("") eq "") {
+        $self->_make('sub {
+    my $self = shift;
+    return @$self[1..$#$self]}');
+    } else {
+        $self->_make('sub {
+    my $self = shift;
+    return map _VALUE($_), @$self[1..$#$self]}');
+    }
+    return $self->values(@_);
+}
+
 sub user_data {
     if (@_ > 1) {
         my $self = shift;
@@ -313,7 +346,7 @@ Heap::Simple - Fast and easy to use classic heaps
     use Heap::Simple;
 
     # Create a heap
-    my $heap = Heap::Simple;
+    my $heap = Heap::Simple->new;
     my $heap = Heap::Simple->new(%options);
 
     # Put data in the heap
@@ -336,6 +369,14 @@ Heap::Simple - Fast and easy to use classic heaps
 
     # Find the number of elements
     $count = $heap->count;
+
+    # Empty the heap
+    $heap->clear;
+
+    # Get all keys (not sorted)
+    @keys = $heap->keys;
+    # Get all values (not sorted)
+    @values = $heap->values;
 
     # Find the key corresponding to a value
     $key = $heap->key($value);
@@ -895,6 +936,23 @@ Returns the number of elements in the heap.
     $heap->insert($_) for 8, 3, 14, -1, 3;
     print $heap->count, "\n";
     # prints 5
+
+=item X<clear>$heap->clear
+
+Removes all elements from the heap.
+
+=item X<keys>@keys = $heap->keys
+
+Returns the keys of all elements in the heap in some unspecified order
+(so don't expect them to be ordered). This may imply a lot of function
+calls if getting the key from an element implies a function call
+(as it does for the L<Method|"Method"> and L<Function|"Function"> element
+types, but not for the L<Object|"Object"> and L<Any|"Any"> element types).
+
+=item X<values>@values = $heap->values
+
+Returns all elements in the heap in some unspecified order
+(does not remove them from the heap).
 
 =item X<user_data>$user_data = $heap->user_data
 

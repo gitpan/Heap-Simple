@@ -1,5 +1,10 @@
 Revision history for Perl extension Heap::Simple.
 
+0.05 2003-05-20
+        - reorder s.t to take much less memory (failed on fast machines with 
+          little memory).
+        - Added keys, values and clear methods, with tests and documentation
+
 0.04  2003-05-19
         - Small documentation changes
         - Bugfix: "Any" and "Object" element types without arguments failed

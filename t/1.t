@@ -4,7 +4,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 5465;
+use Test::More tests => 5631;
 BEGIN { $^W = 1 };
 BEGIN { use_ok("Heap::Simple") };
 
@@ -77,7 +77,7 @@ sub value {
 }
 
 my @order = qw(< > lt gt);
-for (-1..$#order) {
+for (0..$#order, -1) {
     my %order = (order => $_ == -1 ? \&order : $order[$_]);
     $order = $_ == -1 ? 1 : $_;
     $eorder = $_ == -1 ? @order : $order;
@@ -208,6 +208,30 @@ for (-1..$#order) {
             is(@refs, 0, "extract_upto on empty heap returns nothing");
             is($empty_heap->infinity, $infinity[$eorder+1], "Right infinity");
 
+            # keys
+            my @k = sort $heap->keys();
+            @expect = ([qw(10 10 13 14 15 16)], 
+                       [qw(-1 -11 -12 1 8 9)], 
+                       [qw(A13 A14 A15 A16 A8 A9)], 
+                       [qw(A-1 A-11 A-12 A1 A10 A10)]);
+            is_deeply(\@k, $expect[$order], "fetch all keys");
+
+            # values
+            my @v = $heap->values();
+            @expect = ([value($heap,
+                             [10,15],[9,-1],["A13","A10"],["A10","A9"])],
+                       [value($heap,
+                             [14,8],[8,1],["A15","A-11"],["A-12","A16"])],
+                       [value($heap,
+                             [10,9],[1,-12],["A14","A8"],["A10","A15"])],
+                       [value($heap,
+                             [15,-11],[-11,13],["A8","A1"],["A-1",undef])],
+                       [value($heap,
+                             [16,10],[-1,undef],["A16","A10"],["A-11","A13"])],
+                       [value($heap,
+                             [13,10],[-12,16],["A9","A-1"],["A1","A-12"])]);
+            is_deeply(\@v, [map $_->[$order], @expect]);
+
             # insert again for a bit of irregularity, but now use key_insert
             # if we have it.
             if ($key_insert) {
@@ -265,8 +289,8 @@ for (-1..$#order) {
             check_empty($heap);
 
             # Bigger stress test
-            my $n = 5000;
-            my @rand = map int(rand(1000)), 1..$n;
+            my $n = 1000;
+            my @rand = map int(rand(500)), 1..$n;
             my @sorted;
             my @s = $order == 0 ? (sort {$a <=> $b } @rand) :
                 $order == 1 ? (sort {$b <=> $a } @rand) :
@@ -315,3 +339,7 @@ eval { $heap1->insert(5) };
 ok($@, "plain insert fails");
 eval { $heap1->key_insert(5, 6) };
 ok(!$@, "key_insert works");
+is($heap1->count, 1, "heap now has 1 element");
+$heap1->clear;
+$eorder = -1;
+check_empty($heap1);
