@@ -1,5 +1,5 @@
 package Heap::Simple::StringReverse;
-$VERSION = "0.02";
+$VERSION = "0.03";
 use strict;
 
 sub _SMALLER {
@@ -8,6 +8,10 @@ sub _SMALLER {
 
 sub _INF {
     return "";
+}
+
+sub order {
+    return "gt";
 }
 
 1;

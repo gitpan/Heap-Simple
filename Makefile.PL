@@ -1,11 +1,15 @@
+#!/usr/bin/perl -w
+require 5.004;
 use ExtUtils::MakeMaker;
-# See lib/ExtUtils/MakeMaker.pm for details of how to influence
-# the contents of the Makefile that is written.
+BEGIN {
+    @Heap::Simple::implementors = qw(CGI) unless @Heap::Simple::implementors;
+}
 WriteMakefile(
     'NAME'		=> 'Heap::Simple',
-    'VERSION'		=> '0.06',
+    'VERSION_FROM'	=> 'lib/Heap/Simple/Perl.pm',
     'PREREQ_PM'		=> { 
-        "Test::More" => 0.11,	# For the tests only
+        "Heap::Simple"	=> 0.07,	# implementor switch
+        "Test::More" => 0.11,		# For the tests only
     },
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (AUTHOR     => 'Ton Hospel <Heap::Simple@ton.iguana.be>') : ()),

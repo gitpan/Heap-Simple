@@ -2,10 +2,38 @@ Revision history for Perl extension Heap::Simple.
 
 Plan:
   - Deleting
+  - return undef on underflow if requested
   - Tied interface
   - Special handling for duplicate keys (error, share, overwrite, separate)
+  - add a callback for elements lost in max_count overflow
 
-0.06  2004-11-29
+0.07
+        - Split off Heap::Simple to its own package. This package is now
+          Heap::Simple::Perl
+        - Add a "top" method.
+	- Use the "official" constant for infinity (9**9**9)
+        - Expand array, hash and method keys inplace (if safe)
+        - Check for unknown options
+	- Generate code in proper package and with proper name
+	  (defining a function twice is now a redefine warning)
+        - _make substitutions functions must start with _, not just contain it
+	- drop the (always undocumented) internal _init method.
+	  It was too awkward to use anyways.
+        - Move perl code to Simple/Perl.pm in preparation for an XS switch
+	- Renamed the "Key" element type to "Scalar". "Key" remains supported
+          for backward compatibility.
+	- Consistent error message for getting an element of an empty heap.
+        - Document that the methods that return undef on empty are only
+          guaranteed to do so in scalar context.
+        - Added an extract_first method that returns nothing on empty.
+	- Replace test suite with a much cleaner one
+        - More fair speed testing
+        - Added speed compare with Array::Heap2
+	- Added "wrapped", "order" and "elements" methods.
+        - Make index 0 into a hash now that more and more attributes get added
+	- Save and restore $@ around _make() based code creation.
+
+0.06  2004-09-29
         - Don't scare away users by directly explaining all possibilities in
           the docs. Add examples to the top to show basic usage.
         - Fix author email.

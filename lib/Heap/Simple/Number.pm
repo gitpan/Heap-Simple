@@ -1,5 +1,5 @@
 package Heap::Simple::Number;
-$VERSION = "0.02";
+$VERSION = "0.03";
 use strict;
 
 sub _SMALLER {
@@ -7,7 +7,11 @@ sub _SMALLER {
 }
 
 sub _INF {
-    return 1e5000000000;
+    return 9**9**9;
+}
+
+sub order {
+    return "<";
 }
 
 1;
