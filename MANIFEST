@@ -1,0 +1,16 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+Simple.pm
+lib/Heap/Simple/Number.pm
+lib/Heap/Simple/NumberReverse.pm
+lib/Heap/Simple/String.pm
+lib/Heap/Simple/StringReverse.pm
+lib/Heap/Simple/Key.pm
+lib/Heap/Simple/Array.pm
+lib/Heap/Simple/Hash.pm
+t/1.t
+t/2.t
+t/s.t
+t/n.t

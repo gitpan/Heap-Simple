@@ -1,0 +1,14 @@
+Revision history for Perl extension Heap::Simple.
+
+0.01  Wed May 14 16:59:09 2003
+	- original version; created by h2xs 1.22 with options
+		-X -n Heap::Simple
+        - Insert code from my old FastHeap module
+        - Slight code changes
+        - Make special versions (Plain, Array, Hash)
+        - add testcases
+        - Prepare for release
+        - Module set too simular, names too confusing. Refactor module names
+          into arguments.
+        - remove perl 5.6 dependencies (untested)
+        - Prepare for release again.
