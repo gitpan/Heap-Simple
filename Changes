@@ -1,6 +1,19 @@
 Revision history for Perl extension Heap::Simple.
 
-0.01  2004-10-25
+0.09  2004-11-11
+	- Remove double documentation of "first"
+        - Fixed email in Makefile.PL
+        - Oops, required perl 5.8.4 in the Makefile.PL. Module should however
+          work on any perl5.
+        - Updated minimum version numbers of Heap::Simple::Perl and 
+          Heap::Simple::XS
+
+0.08  2004-10-25
+	- Increase the version number so it's higher than the old Heap::Simple
+          (which is now Heap::Simple::Perl). 0.07 was an accidental upload of 
+          Heap::Simple::Perl with the wrong name for the tar.gz file.
+
+0.01  2004-10-23
 	- original version; created by h2xs 1.23 with options
 		-X -n Heap::Simple
 

@@ -1,4 +1,4 @@
-use 5.008004;
+#! /usr/bin/perl -w
 use ExtUtils::MakeMaker;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
@@ -37,5 +37,5 @@ WriteMakefile
      VERSION_FROM      => 'Simple.pm', # finds $VERSION
      PREREQ_PM         => {}, # e.g., Module::Name => 1.1
      ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
-      (AUTHOR         => 'Ton Hospel <ton@home.lunix>') : ()),
+      (AUTHOR         => 'Ton Hospel <Heap::Simple@ton.iguana.be>') : ()),
 );

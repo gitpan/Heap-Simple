@@ -13,5 +13,5 @@ BEGIN {
 use Heap::Simple;
 ok(1); # We can load
 
-my $cgi = Heap::Simple->new("CGI");
+my $cgi = Heap::Simple->new();
 ok($cgi->isa("CGI"));

@@ -43,13 +43,13 @@ SYNOPSIS
     $element = $heap->top;		# croaks on an empty heap
     $element = $heap->first;		# returns undef on an empty heap
 
-    # Extract all data whose key is not above a given value
-    @elements = $heap->extract_upto($max_key);
-
     # Find the top key in the heap
     $top_key = $heap->top_key;	  	# return infinity on an empty heap
 					# croaks if there's no infinity
     $top_key = $heap->first_key;  	# returns undef   on an empty heap
+
+    # Extract all data whose key is not above a given value
+    @elements = $heap->extract_upto($max_key);
 
     # Find the number of elements
     $count = $heap->count;
@@ -122,7 +122,7 @@ implementing the interfaced described above. You can use:
 
 AUTHOR
 
-Ton Hospel, E<lt>Heap::Simple@ton.iguana.beE<gt>
+Ton Hospel, <Heap::Simple@ton.iguana.be>
 
 COPYRIGHT AND LICENCE
 

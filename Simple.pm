@@ -4,10 +4,10 @@ use strict;
 
 # Switch selecting XS or pure perl
 use vars qw($VERSION @ISA @implementors);
-$VERSION = "0.08";
+$VERSION = "0.09";
 
 unless (@ISA) {
-    @implementors = qw(Heap::Simple::XS(0.01) Heap::Simple::Perl(0.07))
+    @implementors = qw(Heap::Simple::XS(0.05) Heap::Simple::Perl(0.08))
         unless @implementors;
     for my $i (@implementors) {
         my $plugin = $i;
@@ -62,13 +62,13 @@ Heap::Simple - Fast and easy to use classic heaps
     $element = $heap->top;		# croaks on an empty heap
     $element = $heap->first;		# returns undef on an empty heap
 
-    # Extract all data whose key is not above a given value
-    @elements = $heap->extract_upto($max_key);
-
     # Find the top key in the heap
     $top_key = $heap->top_key;	  	# return infinity on an empty heap
 					# croaks if there's no infinity
     $top_key = $heap->first_key;  	# returns undef   on an empty heap
+
+    # Extract all data whose key is not above a given value
+    @elements = $heap->extract_upto($max_key);
 
     # Find the number of elements
     $count = $heap->count;
@@ -181,9 +181,9 @@ object, that's what you will get back on extract. It's also ok to keep
 references to the elements around and make changes to them while they are
 in the heap as long as you don't change the key.
 
-Actually, Heap::Simple itself is just a loader for the code that will
-actually implement the functionality mentioned above. You will need to
-install something like L<Heap::Simple::XS|Heap::Simple::XS> or
+Heap::Simple itself is just a loader for the code that will actually implement
+the functionality mentioned above. You will need to install something like
+L<Heap::Simple::XS|Heap::Simple::XS> or
 L<Heap::Simple::Perl|Heap::Simple::Perl> to be able to actually do anything.
 
 =head1 EXPORT
@@ -592,7 +592,7 @@ dropped (the thing just being inserted is among the candidates for dropping).
 
 A max count of 0 may or may not be supported depending on the implementor.
 
-You can for example use this to determine the highest three values in an array:
+You can for example use this to determine the three highest values in an array:
 
     use Heap::Simple;
 
@@ -621,7 +621,7 @@ exceptions during the heap operations is impossible anyways).
 This is a per heap option, so only those heaps that actually set this will
 see a slowdown.
 
-All operations that don't change the heap (like L<count|"count"> or 
+All operations that don't change the heap (like L<count|"count"> or
 L<top|"top">) are always safe.
 
 Note that all change operations always assume you won't recursively cause
@@ -710,36 +710,7 @@ Throws an exception if the heap is empty.
 =item X<first>$element = $heap->first
 
 For all elements in the heap, find the top one (the one that is "lowest" in the
-order relation) and return it (without removing it from the heap)..
-
-Returns undef if the heap is empty.
-
-=item X<extract_upto>@elements = $heap->extract_upto($max_key)
-
-Finds all elements in the heap whose key is not above $value and removes them
-from the heap (so elements with key equal to $max_key get extracted too).
-The list of removed elements is returned ordered by key value (low to high
-with repect to the heap order).
-
-Returns an empty list for the empty heap.
-
-Example:
-
-    use Heap::Simple;
-
-    my $heap = Heap::Simple->new;
-    $heap->insert($_) for 8, 3, 14, -1, 3;
-    print join(", ", $heap->extract_upto(3)), "\n";
-    # prints -1, 3, 3
-
-This method will lose values in case of an exception even if
-L<can_die|"new_can_die"> is true (remember that exceptions of this type are
-only possible if you have a self coded key fetch or compare that can die, so
-this is normally irrelevant).
-
-=item X<min>$element = $heap->first
-
-For all elements in the heap, find the one with the lowest key and return it.
+order relation) and return it (without removing it from the heap).For all elements in the heap, find the one with the lowest key and return it.
 Returns undef (in scalar context) in case the heap is empty. The contents of
 the heap remain unchanged.
 
@@ -788,15 +759,28 @@ Example:
 This method used to be called "min_key" instead of "top_key". The old name is
 still supported but is deprecated.
 
-=item X<key>$key = $heap->key($value)
+=item X<extract_upto>@elements = $heap->extract_upto($max_key)
 
-Calculates the key corresponding to $value in the same way as the internals
-of $heap would. Can fail for L<Object|"Object"> and L<Any|"Any"> element
-types if there was no method or function given on heap creation.
+Finds all elements in the heap whose key is not above $value and removes them
+from the heap (so elements with key equal to $max_key get extracted too).
+The list of removed elements is returned ordered by key value (low to high
+with repect to the heap order).
 
-Notice that this does not access the elements in the heap in any way.
-In particular, it's B<not> looking for $value in the heap hoping to match its
-key.
+Returns an empty list for the empty heap.
+
+Example:
+
+    use Heap::Simple;
+
+    my $heap = Heap::Simple->new;
+    $heap->insert($_) for 8, 3, 14, -1, 3;
+    print join(", ", $heap->extract_upto(3)), "\n";
+    # prints -1, 3, 3
+
+This method will lose values in case of an exception even if
+L<can_die|"new_can_die"> is true (remember that exceptions of this type are
+only possible if you have a self coded key fetch or compare that can die, so
+this is normally irrelevant).
 
 =item X<count>$count = $heap->count
 
@@ -837,6 +821,16 @@ Does not remove the values from the heap.
 
 Multiple calls to an unchanged heap will return the values in the same order,
 which is also consistent with the order of L<keys|"keys">
+
+=item X<key>$key = $heap->key($value)
+
+Calculates the key corresponding to $value in the same way as the internals
+of $heap would. Can fail for L<Object|"Object"> and L<Any|"Any"> element
+types if there was no method or function given on heap creation.
+
+Notice that this does not access the elements in the heap in any way.
+In particular, it's B<not> looking for $value in the heap hoping to match its
+key.
 
 =item X<user_data>$user_data = $heap->user_data
 
