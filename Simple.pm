@@ -3,7 +3,7 @@ use strict;
 use Carp;
 
 use vars qw($VERSION $auto %used);
-$VERSION = "0.03";
+$VERSION = "0.04";
 $auto = "Auto";
 %used = ();
 
@@ -18,10 +18,10 @@ sub _use {
     return require "Heap/Simple/$name.pm";
 }
 
-my %order = ("<" => "Number",
-            ">"	 => "NumberReverse",
-            "lt" => "String",
-            "gt" => "StringReverse",
+my %order = ("<"  => "Number",
+             ">"  => "NumberReverse",
+             "lt" => "String",
+             "gt" => "StringReverse",
              );
 sub _order {
     my ($self, $order) = @_;
@@ -484,8 +484,9 @@ The default infinity for this order is "" (the empty string)
 
 =item $code_reference
 
-If your keys are completely weird things, neither numbers nor strings and you
-need a special compare function, you can use this general ordering type.
+If your keys are completely weird things, ordered neither as numbers nor as 
+strings and you need a special compare function, you can use this general 
+ordering type.
 
 Every time two keys need to be compared, the given code reference will be
 called like:
@@ -521,8 +522,9 @@ wrap the precalculated key with the corresponding element, or you can delegate
 the key calculation to the L<insert|"insert"> method and use one of the
 L<Method|"Method">, L<Object|"Object"> or L<Function|"Function"> element types.
 
-Here's a slightly more complex example, sorting mixed strings:
+Here's an example of such "fake" keys: 
 
+    # "human" sorting mixed strings
     use Heap::Simple;
 
     sub key {
@@ -595,9 +597,11 @@ use this to for example print the values of a hash ordered by key:
     }
 
 You can always use something like [$key, @data] to pair up keys and data,
-so the "Array" element type is rather generally useful. Since it's so common
-to put the key in the first position, you may in fact drop the index in that
-case, so the constructor in the previous example could also be written as:
+so the "Array" element type is rather generally useful (but see the
+L<Object|"Object"> and L<Any|"Any"> element types for another way to pair
+keys with data). Since it's so common to have the key in the first position, 
+you may in fact drop the index in that case, so the constructor in the 
+previous example could also be written as:
 
     my $heap = Heap::Simple->new(order => "lt",
                                  elements => ["Array"]);
@@ -607,7 +611,7 @@ or using the one element rule:
     my $heap = Heap::Simple->new(order => "lt",
                                  elements => "Array");
 
-In case the elements you want to store are array (or array based objects
+In case the elements you want to store are arrays (or array based objects
 (or L<fields based objects|fields>) and you are prepared to break the object
 encapsulation), this element type is also very nice. If for example the value
 on which you want to order is a number at position 4, you could use:
@@ -634,8 +638,8 @@ Redoing the Array example in Hash style gives:
         print $heap->extract_min->{value}, "\n";
     }
 
-In case the elements you want to store are hashes (or based objects and you
-are prepared to break the object encapsulation), this element type is also
+In case the elements you want to store are hashes (or hash based objects and 
+you are prepared to break the object encapsulation), this element type is also
 very nice. If for example the value on which you want to order is a number
 with key "price", you could use:
 
@@ -677,7 +681,7 @@ it faster, but it also uses more memory.
 It also means that it's now perfectly fine to make changes to the object
 that change the key while it is in the heap. This will have absolutely no
 influence on the ordering anymore, and methods like L<first_key|"first_key">
-will return what the key value was at insert time.
+will still return what the key value was at insert time.
 
 Repeating the previous example in this style is a trivial variation:
 
@@ -743,6 +747,19 @@ example could look like:
     my $price = $item_list->price;
     print "All items together will cost $price\n";
     $heap->key_insert($price, $item_list);
+
+Or we can use it to simplify the hash sort on key example a bit:
+
+    use Heap::Simple;
+
+    my $heap = Heap::Simple->new(order => "lt",
+                                 elements => "Any");
+    while (my ($key, $val) = each %hash) {
+        $heap->key_insert($key, $val);
+    }
+    for (1..$heap->count) {
+        print $heap->extract_min, "\n";
+    }
 
 =back
 

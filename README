@@ -77,6 +77,12 @@ To install this module type the following:
    make test
    make install
 
+To install this module into a specific directory, do:
+   perl Makefile.PL PREFIX=/name/of/the/directory
+   ...the rest is the same...
+
+Please also read the perlmodinstall man page, if available.
+
 DEPENDENCIES
 
 This module requires these other modules and libraries:
@@ -90,8 +96,6 @@ Ton Hospel, E<lt>Heap::Simple@home.lunixE<gt>
 Parts are based on code by Joseph N. Hall (http://www.perlfaq.com/faqs/id/196)
 
 COPYRIGHT AND LICENCE
-
-Put the correct copyright and licence information here.
 
 Copyright (C) 2003 Ton Hospel
 

@@ -4,7 +4,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 5461;
+use Test::More tests => 5465;
 BEGIN { $^W = 1 };
 BEGIN { use_ok("Heap::Simple") };
 
@@ -76,21 +76,6 @@ sub value {
     } @_;
 }
 
-# Check equivalences
-my $heap1 = Heap::Simple->new();
-my $heap2 = Heap::Simple->new(elements => ["Key"]);
-is(ref($heap1), ref($heap2), "Default is element type Key");
-$heap2 = Heap::Simple->new(elements => "Key");
-is(ref($heap1), ref($heap2), "Short form of Key");
-$heap2 = Heap::Simple->new(order => "<");
-is(ref($heap1), ref($heap2), "Default order is <");
-
-$heap1 = Heap::Simple->new(elements => [Array => 0]);
-$heap2 = Heap::Simple->new(elements => ["Array"]);
-is(ref($heap1), ref($heap2), "Default is array index is 0");
-$heap2 = Heap::Simple->new(elements => "Array");
-is(ref($heap1), ref($heap2), "Short form of Array");
-
 my @order = qw(< > lt gt);
 for (-1..$#order) {
     my %order = (order => $_ == -1 ? \&order : $order[$_]);
@@ -119,7 +104,7 @@ for (-1..$#order) {
         is($empty_heap->infinity($infinity[$eorder+1]), $infinity[$eorder],
            "infinity set returns old value");
         is($empty_heap->infinity, $infinity[$eorder+1], "Right infinity");
-        
+
         isa_ok($empty_heap, "Heap::Simple", "new creates Heap::Simple");
         my @expect = qw(Heap::Simple::Number Heap::Simple::NumberReverse
                       Heap::Simple::String Heap::Simple::StringReverse
@@ -198,8 +183,8 @@ for (-1..$#order) {
             unless ($basic) {
                 isa_ok($_, "Wombat", "bless survives storage") for @refs;
             }
-            @expect =([value($heap, 
-                             [-11,13],[15,-11],["A-11","A13"],["A8","A1"])], 
+            @expect =([value($heap,
+                             [-11,13],[15,-11],["A-11","A13"],["A8","A1"])],
                       [value($heap,
                              [-1,undef],[14,8],["A-12","A16"],["A16","A10"])]);
             is_deeply(\@refs, [map $_->[$order], @expect]);
@@ -237,7 +222,7 @@ for (-1..$#order) {
                 }
                 is($key_lookup, 0, "Internals never looked up key");
             } else {
-                ok(!$heap->can("key_insert"), 
+                ok(!$heap->can("key_insert"),
                    "others don't even HAVE key_insert");
                 print STDERR "\n$heap has key_insert\n" if $heap->can("key_insert");
                 for my $i (1..5) {
@@ -268,7 +253,7 @@ for (-1..$#order) {
             is($heap->count, @keys-1, "Count keeps up");
 
             # key
-            is($heap->key($heap->first), $heap->first_key, 
+            is($heap->key($heap->first), $heap->first_key,
                "Recover key from element");
 
             # Check if we still have the right associated data
@@ -304,3 +289,29 @@ for (-1..$#order) {
     ok($@, "missing key_name should fail");
 }
 
+# Check equivalences
+my $heap1 = Heap::Simple->new();
+my $heap2 = Heap::Simple->new(elements => ["Key"]);
+is(ref($heap1), ref($heap2), "Default is element type Key");
+$heap2 = Heap::Simple->new(elements => "Key");
+is(ref($heap1), ref($heap2), "Short form of Key");
+$heap2 = Heap::Simple->new(order => "<");
+is(ref($heap1), ref($heap2), "Default order is <");
+
+$heap1 = Heap::Simple->new(elements => [Array => 0]);
+$heap2 = Heap::Simple->new(elements => ["Array"]);
+is(ref($heap1), ref($heap2), "Default is array index is 0");
+$heap2 = Heap::Simple->new(elements => "Array");
+is(ref($heap1), ref($heap2), "Short form of Array");
+
+# Check these degenerate cases
+$heap1 = Heap::Simple->new(elements => "Any");
+eval { $heap1->insert(5) };
+ok($@, "plain insert fails");
+eval { $heap1->key_insert(5, 6) };
+ok(!$@, "key_insert works");
+$heap1 = Heap::Simple->new(elements => "Object");
+eval { $heap1->insert(5) };
+ok($@, "plain insert fails");
+eval { $heap1->key_insert(5, 6) };
+ok(!$@, "key_insert works");

@@ -6,7 +6,7 @@ use Carp;
 sub _elements {
     my ($class, $self, $name, $elements) = @_;
     croak "missing key method for object elements" unless
-        defined($elements->[1]) || $self->isa("Heap::Simple::Wrapper");
+        defined($elements->[1]) || $class->isa("Heap::Simple::Wrapper");
     $self->[0][2] = $elements->[1];
     return $name;
 }
@@ -25,7 +25,7 @@ sub key_method {
 
 sub key {
     my $name =shift->[0][2];
-    return shift->$name();
+    shift->$name();
 }
 
 1;
