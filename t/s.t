@@ -10,6 +10,9 @@ BEGIN { use_ok("Heap::Simple") };
 BEGIN { use_ok('Benchmark') };
 
 my $cachegrind = 0;
+my $simple_only = 0;
+# Don't use insanely much memory even on very fast computers
+my $max_size = 1e6;
 my $i;
 
 sub report {
@@ -23,25 +26,25 @@ sub mark {
     print STDERR "------\n";
 }
 
-my $f_heap   = !$cachegrind && eval '
+my $f_heap   = !$simple_only && !$cachegrind && eval '
           use Heap::Fibonacci;
           use Heap::Elem::Num qw(NumElem);
           use Heap::Elem::Str qw(StrElem);
           1';
-my $b_heap = !$cachegrind && eval '
+my $b_heap = !$simple_only && !$cachegrind && eval '
           use Heap::Binary;
           use Heap::Elem::Num qw(NumElem);
           use Heap::Elem::Str qw(StrElem);
           1';
-my $p_heap = !$cachegrind && eval '
+my $p_heap = !$simple_only && !$cachegrind && eval '
           use Heap::Priority;
           1';
 
 print STDERR "\n";
-my $Size;
+my $size;
 my $calibrate = 5;
 if ($cachegrind) {
-    $Size = 10000;
+    $size = 10000;
 } else {
     # Calibrate perl speed
     my $from = time;
@@ -52,9 +55,10 @@ if ($cachegrind) {
     do {
         $i++ for 1..10000;
     } while $from > time;
-    $Size = int($i/$calibrate/24);
-    $Size *= 5 if !$b_heap && !$f_heap && !$p_heap;
-    $Size =~ s/\B./0/g;
+    $size = int($i/$calibrate/24);
+    $size *= 5 if !$b_heap && !$f_heap && !$p_heap;
+    $size =~ s/\B./0/g;
+    $size = $max_size if $size > $max_size;
 }
 
 for my $string (0) {
@@ -71,10 +75,12 @@ for my $string (0) {
         $p_heap->lowest_first;
     }
 
-    my @array = map int(rand(2*$Size)), 1..$Size;
+    my @array = map int(rand(2*$size)), 1..$size;
     # Only do few priority levels, or it's unfair to Heap::Priority
+    my $levels = int sqrt $size;
+    $levels =~ s/\B./0/g;
     my $pre = $string ? "A" : "";
-    my @parray = map [$pre . $i++, $_%100], @array if $p_heap;
+    my @parray = map [$pre . $i++, $_%$levels], @array if $p_heap;
     if ($string) {
         $_ = "A$_" for @array;
     }
@@ -89,62 +95,62 @@ for my $string (0) {
 
     if ($f_heap) {
         mark();
-        report("insert of $Size elements into Heap::Fibonacci",
-               $Size,
+        report("insert of $size elements into Heap::Fibonacci",
+               $size,
                sub { $f_heap->add($harray[$i++]) });
-        report("Extract $Size elements from Heap::Fibonacci",
-               $Size,
+        report("Extract $size elements from Heap::Fibonacci",
+               $size,
                sub { $f_heap->extract_minimum },
                );
     }
     if ($b_heap) {
         mark();
-        report("insert of $Size elements into Heap::Binary",
-               $Size,
+        report("insert of $size elements into Heap::Binary",
+               $size,
                sub { $b_heap->add($harray[$i++]) });
-        report("Extract $Size elements from Heap::Binary",
-               $Size,
+        report("Extract $size elements from Heap::Binary",
+               $size,
                sub { $b_heap->extract_minimum });
     }
     @harray = ();
 
     if ($p_heap) {
         mark();
-        report("insert of $Size elements into Heap::Priority (100 levels)",
-               $Size,
+        report("insert of $size elements into Heap::Priority ($levels levels)",
+               $size,
                sub { $p_heap->add(@{$parray[$i++]}) });
-        report("Extract $Size elements from Heap::Priority (100 levels)",
-               $Size,
+        report("Extract $size elements from Heap::Priority ($levels levels)",
+               $size,
                sub { $p_heap->pop });
     }
     @parray = ();
 
     if ($h_heap) {
         mark();
-        report("insert of $Size elements into Heap::Simple(order => '$order', Hash)",
-               $Size,
+        report("insert of $size elements into Heap::Simple(order => '$order', Hash)",
+               $size,
                sub { $h_heap->insert({foo => $array[$i++]}) });
-        report("Extract $Size elements from Heap::Simple(order => '$order', Hash)",
-               $Size,
-               sub { $h_heap->extract_min });
+        report("Extract $size elements from Heap::Simple(order => '$order', Hash)",
+               $size,
+               sub { $h_heap->extract_top });
     }
     if ($a_heap) {
         mark();
-        report("insert of $Size elements into Heap::Simple(order => '$order', Array)",
-               $Size,
+        report("insert of $size elements into Heap::Simple(order => '$order', Array)",
+               $size,
                sub { $a_heap->insert([$array[$i++]]) });
-        report("Extract $Size elements from Heap::Simple(order => '$order', Array)",
-               $Size,
-               sub { $a_heap->extract_min });
+        report("Extract $size elements from Heap::Simple(order => '$order', Array)",
+               $size,
+               sub { $a_heap->extract_top });
     }
     if ($num_heap) {
         mark();
-        report("insert of $Size elements into Heap::Simple(order => '$order')",
-               $Size,
+        report("insert of $size elements into Heap::Simple(order => '$order')",
+               $size,
                sub { $num_heap->insert($array[$i++]) });
-        report("Extract $Size elements from Heap::Simple(order => '$order')",
-               $Size,
-               sub { $num_heap->extract_min } );
+        report("Extract $size elements from Heap::Simple(order => '$order')",
+               $size,
+               sub { $num_heap->extract_top } );
     }
     mark();
 }

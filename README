@@ -36,7 +36,7 @@ SYNOPSIS
     $heap->key_insert($key, $element);
 
     # Extract data
-    $element = $heap->extract_min;
+    $element = $heap->extract_top;
 
     # Extract all data whose key is not above a given value
     @elements = $heap->extract_upto($max_key);
@@ -45,8 +45,8 @@ SYNOPSIS
     $element = $heap->first;
 
     # Find the lowest value in the heap
-    $min_key = $heap->first_key;  # returns undef   on an empty heap
-    $min_key = $heap->min_key;	  # return infinity on an empty heap
+    $top_key = $heap->first_key;  # returns undef   on an empty heap
+    $top_key = $heap->top_key;	  # return infinity on an empty heap
 
     # Find the key corresponding to a value
     $key = $heap->key($value);
@@ -99,7 +99,7 @@ This module requires these other modules and libraries:
 
 AUTHOR
 
-Ton Hospel, E<lt>Heap::Simple@home.lunixE<gt>
+Ton Hospel, E<lt>Heap::Simple@ton.iguana.beE<gt>
 
 Parts are based on code by Joseph N. Hall (http://www.perlfaq.com/faqs/id/196)
 

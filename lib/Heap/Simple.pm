@@ -3,7 +3,7 @@ use strict;
 use Carp;
 
 use vars qw($VERSION $auto %used);
-$VERSION = "0.05";
+$VERSION = "0.06";
 $auto = "Auto";
 %used = ();
 
@@ -126,6 +126,7 @@ sub _make {
     print STDERR "Code: $string\n" if DEBUG;
     no warnings 'redefine';
     no strict 'refs';
+    die "Duplicate attempt to set $subroutine" if defined(*$subroutine{CODE});
     *$subroutine = eval $string;
     die $@ if $@;
 }
@@ -150,7 +151,8 @@ sub insert {
     _ORDER_PREPARE()
     my $i = @$self;
     $i = $i >> 1 while $i > 1 && _SMALLER($key, ($self->[$i] = $self->[$i >> 1]));
-    $self->[$i] = $key}');
+    $self->[$i] = $key;
+    return}');
     } else {
         $self->_make('sub {
     my ($self, $value) = @_;
@@ -159,7 +161,8 @@ sub insert {
     my $i = @$self;
     $i = $i >> 1 while
         $i > 1 && _SMALLER($key, _KEY(($self->[$i] = $self->[$i >> 1])));
-    $self->[$i] = _WRAPPER($key, $value)}');
+    $self->[$i] = _WRAPPER($key, $value);
+    return}');
     }
     $self->insert(@_);
 }
@@ -170,11 +173,52 @@ sub extract_upto {
     my ($self, $border) = @_;
     _PREPARE()
     my @result;
-    push(@result, $self->extract_min) until
+    push(@result, $self->extract_top) until
         @$self <= 1 || _SMALLER($border, _KEY($self->[1]));
     return @result
 }');
     $self->extract_upto(@_);
+}
+
+sub extract_top {
+    my $self = shift;
+    $self->_make('sub {
+    my $self = shift;
+    if (@$self <= 2) {
+        return _VALUE(pop(@$self)) if @$self == 2;
+        croak "heap underflow";
+    }
+    my $min = _VALUE($self->[1]);
+    _PREPARE()
+    my $key = _KEY($self->[-1]);
+    my $n = @$self-2;
+    my $i = 1;
+    my $l = 2;
+    while ($l < $n) {
+        if (_SMALLER(_KEY($self->[$l]), $key)) {
+            if (_SMALLER(_KEY($self->[$l+1]), _KEY($self->[$l]))) {
+                $self->[$i] = $self->[$l+1];
+                $i = $l+1;
+            } else {
+                $self->[$i] = $self->[$l];
+                $i = $l;
+            }
+        } elsif (_SMALLER(_KEY($self->[$l+1]), $key)) {
+            $self->[$i] = $self->[$l+1];
+            $i = $l+1;
+        } else {
+            last;
+        }
+        $l = $i * 2;
+    }
+    if ($l == $n && _SMALLER(_KEY($self->[$l]), $key)) {
+        $self->[$i] = $self->[$l];
+        $i = $l;
+    }
+    $self->[$i] = pop(@$self);
+    return $min
+}');
+    $self->extract_top(@_);
 }
 
 sub extract_min {
@@ -215,7 +259,27 @@ sub extract_min {
     $self->[$i] = pop(@$self);
     return $min
 }');
-    $self->extract_min(@_);
+    $self->extract_top(@_);
+}
+
+sub top_key {
+    my $self = shift;
+    if ($self->can("_QUICK_KEY")) {
+        $self->_make('sub {
+    my $self = shift;
+    return @$self > 1 ? _QUICK_KEY($self->[1]) :
+        defined($self->[0][1]) ? $self->[0][1] : croak "Heap empty"
+}');
+    } else {
+        $self->_make('sub {
+    my $self = shift;
+    return defined($self->[0][1]) ? $self->[0][1] : croak "Heap empty" if
+        @$self <= 1;
+    _ELEMENTS_PREPARE()
+    return _KEY($self->[1])
+}');
+    }
+    $self->top_key(@_);
 }
 
 sub min_key {
@@ -235,7 +299,7 @@ sub min_key {
     return _KEY($self->[1])
 }');
     }
-    $self->min_key(@_);
+    $self->top_key(@_);
 }
 
 sub first_key {
@@ -337,6 +401,10 @@ sub infinity {
     return shift->[0][1];
 }
 
+#sub key_insert {
+#    croak "Wrong Heap type, does not support key_insert";
+#}
+
 =head1 NAME
 
 Heap::Simple - Fast and easy to use classic heaps
@@ -355,7 +423,7 @@ Heap::Simple - Fast and easy to use classic heaps
     $heap->key_insert($key, $element);
 
     # Extract data
-    $element = $heap->extract_min;
+    $element = $heap->extract_top;
 
     # Extract all data whose key is not above a given value
     @elements = $heap->extract_upto($max_key);
@@ -364,8 +432,8 @@ Heap::Simple - Fast and easy to use classic heaps
     $element = $heap->first;
 
     # Find the lowest value in the heap
-    $min_key = $heap->first_key;  # returns undef   on an empty heap
-    $min_key = $heap->min_key;	  # return infinity on an empty heap
+    $top_key = $heap->first_key;  # returns undef   on an empty heap
+    $top_key = $heap->top_key;	  # return infinity on an empty heap
 
     # Find the number of elements
     $count = $heap->count;
@@ -395,6 +463,48 @@ Heap::Simple - Fast and easy to use classic heaps
     $key_method   = $heap->key_method;
     $key_function = $heap->key_function;
 
+=head1 EXAMPLE1
+
+    use Heap::Simple;
+    my $heap = Heap::Simple->new(elements => "Any");
+
+    $heap->key_insert(8, "bar");
+    $heap->key_insert(5, "foo");
+
+    # This will print foo (5 is the top key)
+    print "First value is ", $heap->extract_top, "\n";
+
+    $heap->key_insert(7, "baz");
+
+    # This will print baz (7 is the top key)
+    print "Next value is ", $heap->extract_top, "\n";
+    # This will print bar (8 is now the top key)
+    print "Next value is ", $heap->extract_top, "\n";
+
+=head1 EXAMPLE2
+
+    # This is purely for display, ignore it
+    use Data::Dumper;
+    $Data::Dumper::Indent = 0;
+    $Data::Dumper::Terse = 1;
+
+    # Real code starts here
+    use Heap::Simple;
+    my $heap = Heap::Simple->new(elements => "Array");
+
+    $heap->insert([8, "bar"]);
+    $heap->insert([5, "foo"]);
+
+    # This will print [5, foo] (5 is the top key)
+    print "First value is ", Dumper($heap->extract_top), "\n";
+
+    $heap->insert([7, "baz"]);
+
+    # This will print [7, baz] (7 is the top key)
+    print "Next value is ", Dumper($heap->extract_top), "\n";
+    # This will print [8, bar] (8 is now the top key)
+    print "Next value is ", Dumper($heap->extract_top), "\n";
+
 =head1 DESCRIPTION
 
 A heap is a partially sorted structure where it's always easy to extract the
@@ -422,7 +532,15 @@ None.
 
 =head1 METHODS
 
-=over 4
+New has a lot of ways to specify element types, but the right choices
+follows quite directly from the data you'll put in the heap. If the key
+is part of the data (or easily derived from the data), choose an element
+type that tells how to get the key out of the data, and insert elements
+using L<insert|/"insert">. If the key is independent from the data or
+you want to avoid repeated key calculations, use the L<Any|/"Any"> element
+type and insert elements using L<key_insert|/"key_insert">.
+
+=over
 
 =item X<new>my $heap = Heap::Simple->new
 
@@ -434,7 +552,7 @@ You could for example use this to print a list of numbers from low to high:
 
     my $heap = Heap::Simple->new;
     $heap->insert($_) for 8, 3, 14, -1, 3;
-    print $heap->extract_min, " " for 1..$heap->count;
+    print $heap->extract_top, " " for 1..$heap->count;
     print "\n";
     # Will print: -1 3 3 8 14
 
@@ -473,7 +591,7 @@ The default infinity for this order is +inf.
 =item E<gt>
 
 Indicates that keys are compared as numbers, and extraction is highest value
-first. This means that methods like L<extract_min|"extract_min"> become
+first. This means that methods like L<extract_top|"extract_top"> become
 rather confusing in name, since they extract the maximum in the sense of
 the numeric value (but it's still the smallest value in terms of the
 abstract order relation).
@@ -484,7 +602,7 @@ Repeating the example with this order gives:
 
     my $heap = Heap::Simple->new(order => ">");
     $heap->insert($_) for 8, 3, 14, -1, 3;
-    print $heap->extract_min, " " for 1..$heap->count;
+    print $heap->extract_top, " " for 1..$heap->count;
     print "\n";
     # Will print: 14 8 3 3 -1
 
@@ -499,7 +617,7 @@ value first. So we could modify the "<" example to:
 
     my $heap = Heap::Simple->new(order => "lt");
     $heap->insert($_) for "ate", 8, 3, "zzzz", 14, -1, 3, "at";
-    print $heap->extract_min, " " for 1..$heap->count;
+    print $heap->extract_top, " " for 1..$heap->count;
     print "\n";
     # Will print: -1 14 3 3 8 at ate zzzz
 
@@ -517,7 +635,7 @@ The standard example now becomes:
 
     my $heap = Heap::Simple->new(order => "gt");
     $heap->insert($_) for "ate", 8, 3, "zzzz", 14, -1, 3, "at";
-    print $heap->extract_min, " " for 1..$heap->count;
+    print $heap->extract_top, " " for 1..$heap->count;
     print "\n";
     # Will print: zzzz ate at 8 3 3 14 -1
 
@@ -550,7 +668,7 @@ Example:
 
     my $heap = Heap::Simple->new(order => \&more);
     $heap->insert($_) for 8, 3, 14, -1, 3;
-    print $heap->extract_min, " " for 1..$heap->count;
+    print $heap->extract_top, " " for 1..$heap->count;
     print "\n";
     # Will print: 14 8 3 3 -1
 
@@ -578,7 +696,7 @@ Here's an example of such "fake" keys:
                                  elements => [Function => \&key]);
     $heap->insert($_) for qw(Athens5.gr Athens40.gr
                              Amsterdam51.nl Amsterdam5.nl amsterdam20.nl);
-    print $heap->extract_min, "\n" for 1..$heap->count;
+    print $heap->extract_top, "\n" for 1..$heap->count;
     # This will print:
     Amsterdam5.nl
     amsterdam20.nl
@@ -634,7 +752,7 @@ use this to for example print the values of a hash ordered by key:
         $heap->insert([$key, $val]);
     }
     for (1..$heap->count) {
-        print $heap->extract_min->[1], "\n";
+        print $heap->extract_top->[1], "\n";
     }
 
 You can always use something like [$key, @data] to pair up keys and data,
@@ -676,7 +794,7 @@ Redoing the Array example in Hash style gives:
         $heap->insert({tag => $key, value => $val});
     }
     for (1..$heap->count) {
-        print $heap->extract_min->{value}, "\n";
+        print $heap->extract_top->{value}, "\n";
     }
 
 In case the elements you want to store are hashes (or hash based objects and 
@@ -736,7 +854,7 @@ calculate the key, but do it yourself before the insert, and then use
 L<key_insert|"key_insert">. In fact, if you never use plain L<insert|"insert">
 at all, you don't even have to bother passing a method name (though in that
 case the fact that the thing you store is an object is pretty irrelevant and
-it's probable more natural to use the L<Any element type|"Any">.
+it's probable more natural to use the L<Any element type|"Any">).
 
 =item X<Function>[Function => $code_reference]
 
@@ -799,7 +917,7 @@ Or we can use it to simplify the hash sort on key example a bit:
         $heap->key_insert($key, $val);
     }
     for (1..$heap->count) {
-        print $heap->extract_min, "\n";
+        print $heap->extract_top, "\n";
     }
 
 =back
@@ -825,7 +943,7 @@ Setting it to "undef" means there is no infinity associated with the heap.
 The default value depends on the L<order|"order"> relation that was
 specified.
 
-Usually you can just forget about this option. Only L<min_key|"min_key">
+Usually you can just forget about this option. Only L<top_key|"top_key">
 really cares.
 
 =back
@@ -848,10 +966,13 @@ L<"Object"|"Object"> and L<"Any"|"Any"> heaps.
 On extraction you get back exactly the same $element as you inserted,
 including a possible L<blessing|perlfunc/"bless">.
 
-=item X<extract_min>$element = $heap->extract_min
+=item X<extract_top>$element = $heap->extract_top
 
-For all elements in the heap, find the one with the lowest key, remove it from
-the heap and return it.
+For all elements in the heap, find the top one (the one that is "lowest" in the
+order relation), remove it from the heap and return it.
+
+This method used to be called C<"extract_min"> instead of C<"extract_top">. 
+The old name is still supported but is deprecated.
 
 Throws an exception if the heap is empty.
 
@@ -891,7 +1012,7 @@ Example:
     print $heap->first, "\n";
     # prints -1
 
-=item X<first_key>$min_key = $heap->first_key
+=item X<first_key>$top_key = $heap->first_key
 
 Looks for the lowest key in the heap and returns its value. Returns undef
 in case the heap is empty
@@ -905,7 +1026,7 @@ Example:
     print $heap->first_key, "\n";
     # prints -1
 
-=item X<min_key>$min_key = $heap->min_key
+=item X<top_key>$top_key = $heap->top_key
 
 Looks for the lowest key in the heap and returns its value. Returns the highest
 possible value (the infinity for the chosen order) in case the heap is empty.
@@ -917,14 +1038,21 @@ Example:
 
     my $heap = Heap::Simple->new;
     $heap->insert($_) for 8, 3, 14, -1, 3;
-    print $heap->min_key, "\n";
+    print $heap->top_key, "\n";
     # prints -1
+
+This method used to be called "min_key" instead of "top_key". The old name is 
+still supported but is deprecated.
 
 =item X<key>$key = $heap->key($value)
 
 Calculates the key corresponding to $value in the same way as the internals
 of $heap would. Can fail for L<Object|"Object"> and L<Any|"Any"> element
 types if there was no method or function given on heap creation.
+
+Notice that this does not access the elements in the heap in any way. 
+In particular, it's B<not> looking for $value in the heap hoping to match its 
+key.
 
 =item X<count>$count = $heap->count
 
@@ -949,10 +1077,16 @@ calls if getting the key from an element implies a function call
 (as it does for the L<Method|"Method"> and L<Function|"Function"> element
 types, but not for the L<Object|"Object"> and L<Any|"Any"> element types).
 
+Multiple calls to an unchanged heap will return the keys in the same order,
+which is also consistent with the order of L<values|"values">
+
 =item X<values>@values = $heap->values
 
 Returns all elements in the heap in some unspecified order
 (does not remove them from the heap).
+
+Multiple calls to an unchanged heap will return the values in the same order,
+which is also consistent with the order of L<keys|"keys">
 
 =item X<user_data>$user_data = $heap->user_data
 
@@ -967,7 +1101,7 @@ Associates new user_data with the heap. Returns the old value.
 Queries the infinity value associated with the heap. Returns undef if there
 is none. The default infinity is implied by the chosen order relation.
 
-=item $old_infinity = $heap->user_data($new_infinity)
+=item $old_infinity = $heap->infinity($new_infinity)
 
 Associates a new infinity with the heap. Returns the old value.
 
@@ -1000,7 +1134,7 @@ L<Heap::Priority>
 
 =head1 AUTHOR
 
-Ton Hospel, E<lt>Heap::Simple@home.lunixE<gt>
+Ton Hospel, E<lt>Heap::Simple@ton.iguana.beE<gt>
 
 Parts are based on code by Joseph N. Hall (http://www.perlfaq.com/faqs/id/196)
 

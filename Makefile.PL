@@ -3,8 +3,10 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
     'NAME'		=> 'Heap::Simple',
-    'VERSION_FROM'	=> 'Simple.pm', # finds $VERSION
-    'PREREQ_PM'		=> { Test::More => 0.11 },
+    'VERSION'		=> '0.06',
+    'PREREQ_PM'		=> { 
+        "Test::More" => 0.11,	# For the tests only
+    },
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
-      (AUTHOR     => 'Ton Hospel <Heap::Simple@home.lunix>') : ()),
+      (AUTHOR     => 'Ton Hospel <Heap::Simple@ton.iguana.be>') : ()),
 );

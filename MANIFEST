@@ -2,7 +2,7 @@ Changes
 Makefile.PL
 MANIFEST
 README
-Simple.pm
+lib/Heap/Simple.pm
 lib/Heap/Simple/Number.pm
 lib/Heap/Simple/NumberReverse.pm
 lib/Heap/Simple/String.pm
@@ -18,3 +18,4 @@ lib/Heap/Simple/Any.pm
 lib/Heap/Simple/Wrapper.pm
 t/1.t
 t/s.t
+META.yml                                 Module meta-data (added by MakeMaker)

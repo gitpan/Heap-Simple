@@ -31,7 +31,9 @@ sub key_insert {
     my $i = @$self;
     $i = $i >> 1 while
         $i > 1 && _SMALLER($key, _KEY(($self->[$i] = $self->[$i >> 1])));
-    $self->[$i] = _WRAPPER($key, shift)}');
+    $self->[$i] = _WRAPPER($key, shift);
+    return};
+    ');
     $self->key_insert(@_);
 }
 

@@ -4,7 +4,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 5631;
+use Test::More tests => 6421;
 BEGIN { $^W = 1 };
 BEGIN { use_ok("Heap::Simple") };
 
@@ -36,11 +36,11 @@ sub check_empty {
     is($heap->first_key, undef, "First key returns undef on empty heap");
     my $expect = $heap->infinity;
     is($expect, $infinity[$eorder+1], "Still the infinity we set");
-    my $val = eval { $heap->min_key };
+    my $val = eval { $heap->top_key };
     if (defined($expect)) {
-        is($val, $expect, "Min key returns '$expect' on empty heap");
+        is($val, $expect, "Top key returns '$expect' on empty heap");
     } else {
-        ok($@, "min_key should fail");
+        ok($@, "top_key should fail");
     }
 }
 
@@ -162,19 +162,27 @@ for (0..$#order, -1) {
                 my $fail = eval { $heap->key_index };
                 ok($@, "There is no key_index");
             }
+
+            # Check extract_min backward compatibility
+            $heap->insert(my $in = make($keys[0], $keys[1]));
+            my $ref = $heap->extract_min;
+            isa_ok($ref, "Wombat", "bless survives storage") unless $basic;
+            is_deeply($ref, $in, "We extract what we put in");
+            check_empty($heap);
+
             # insert
             for my $i (1..@keys) {
                 $heap->insert(make($keys[$i-1], $keys[$i]));
                 is($heap->count, $i, "Count keeps up");
             }
 
-            # extract_min
-            my $ref = $heap->extract_min;
+            # extract_top
+            $ref = $heap->extract_top;
             isa_ok($ref, "Wombat", "bless survives storage") unless $basic;
             is($heap->count, @keys-1, "Count right after extract");
             @expect = value($heap, [-12, 16], [16, 10], ["A-1", undef], ["A9", "A-1"]);
             is_deeply($ref, $expect[$order], "We extract what we put in");
-            $ref = eval { $empty_heap->extract_min };
+            $ref = eval { $empty_heap->extract_top };
             ok($@, "Extracting from empty heap dies");
 
             # extract_upto
@@ -270,6 +278,12 @@ for (0..$#order, -1) {
             is($heap->count, @keys-1, "Count keeps up");
             # already checked on empty heap
 
+            # top_key
+            $min = eval { $heap->top_key };
+            is($@, "", "top_key works");
+            is($min, $expect[$order], "Found top key");
+            is($heap->count, @keys-1, "Count keeps up");
+
             # min_key
             $min = eval { $heap->min_key };
             is($@, "", "min_key works");
@@ -285,7 +299,7 @@ for (0..$#order, -1) {
             is($heap->user_data, "bar", "user_data survived everything");
 
             # Now drop all values
-            $heap->extract_min for 1..$heap->count;
+            $heap->extract_top for 1..$heap->count;
             check_empty($heap);
 
             # Bigger stress test
@@ -299,12 +313,12 @@ for (0..$#order, -1) {
                             die "Unhandled order $order";
             $heap->insert(make($_, "foo")) for @rand;
             if ($index && $index =~ /[^\d-]/) {
-                @sorted = map $heap->extract_min->{$index}, @rand;
+                @sorted = map $heap->extract_top->{$index}, @rand;
             } elsif ($basic) {
-                @sorted = map $heap->extract_min, @rand;
+                @sorted = map $heap->extract_top, @rand;
             } else {
                 my $i = $index || 0;
-                @sorted = map $heap->extract_min->[$i], @rand;
+                @sorted = map $heap->extract_top->[$i], @rand;
             }
             is_deeply(\@sorted, \@s, "insert/extract from heap is like sort");
         }
