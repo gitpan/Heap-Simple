@@ -4,10 +4,10 @@ use strict;
 
 # Switch selecting XS or pure perl
 use vars qw($VERSION @ISA @implementors);
-$VERSION = "0.09";
+$VERSION = "0.10";
 
 unless (@ISA) {
-    @implementors = qw(Heap::Simple::XS(0.05) Heap::Simple::Perl(0.08))
+    @implementors = qw(Heap::Simple::XS(0.08) Heap::Simple::Perl(0.11))
         unless @implementors;
     for my $i (@implementors) {
         my $plugin = $i;
@@ -50,9 +50,9 @@ Heap::Simple - Fast and easy to use classic heaps
     my $heap = Heap::Simple->new(%options);
 
     # Put data in the heap
-    $heap->insert($element);
+    $heap->insert(@new_elements);
     # Put data in a "Object" or "Any" heap with a given key
-    $heap->key_insert($key, $element);
+    $heap->key_insert($key1, $element1, $key2, $element2, ...);
 
     # Extract the top value
     $element = $heap->extract_top;	# croaks on an empty heap
@@ -67,14 +67,17 @@ Heap::Simple - Fast and easy to use classic heaps
 					# croaks if there's no infinity
     $top_key = $heap->first_key;  	# returns undef   on an empty heap
 
-    # Extract all data whose key is not above a given value
+    # Ordered extract of all data whose key is not above a given value
     @elements = $heap->extract_upto($max_key);
 
-    # Find the number of elements
-    $count = $heap->count;
+    # Ordered extract of all data
+    @elements = $heap->extract_all;
 
     # Empty the heap
     $heap->clear;
+
+    # Find the number of elements
+    $count = $heap->count;
 
     # Get all keys (not sorted)
     @keys = $heap->keys;
@@ -107,9 +110,13 @@ Heap::Simple - Fast and easy to use classic heaps
     @elements     = $heap->elements;
     $elements     = $heap->elements;
 
-    # Move all elements from $heap2 to $heap1
-    $heap1->absorb($heap2);	# As if doing a repeated $heap1->insert
-    $heap1->key_absorb($heap2);	# As if doing a repeated $heap1->key_insert
+    # Move all elements out of each heap in @heaps and into $heap
+    $heap->absorb(@heaps);	# As if doing a repeated $heap->insert
+    $heap->key_absorb(@heaps);	# As if doing a repeated $heap->key_insert
+
+    # merge already sorted arrays into a new sorted array
+    # This doesn't disturb the elements already in the heap
+    my $merged_aref = $heap->merge_arrays($aref1, $aref2, ...);
 
     # Which class does the actual work ?
     $implementation = Heap::Simple->implementation;
@@ -175,6 +182,14 @@ The module allows you to manage data where the elements are of several
 allowed types, in particular array references, hash references, objects
 or just the keys themselves.
 
+So L<new|"new"> has a lot of ways to specify element types, but the right
+choices follows quite directly from the data you'll put in the heap. If the key
+is part of the data (or easily derived from the data), choose an element
+type that tells how to get the key out of the data, and insert elements
+using L<insert|/"insert">. If the key is independent from the data or
+you want to avoid repeated key calculations, use the L<Any|/"Any"> element
+type and insert elements using L<key_insert|/"key_insert">.
+
 The internals of the module do nothing with the elements inserted except
 inspecting the key. This means that if you for example store a blessed
 object, that's what you will get back on extract. It's also ok to keep
@@ -192,13 +207,10 @@ None.
 
 =head1 METHODS
 
-New has a lot of ways to specify element types, but the right choices
-follows quite directly from the data you'll put in the heap. If the key
-is part of the data (or easily derived from the data), choose an element
-type that tells how to get the key out of the data, and insert elements
-using L<insert|/"insert">. If the key is independent from the data or
-you want to avoid repeated key calculations, use the L<Any|/"Any"> element
-type and insert elements using L<key_insert|/"key_insert">.
+All methods that can fail will thrown an exception in case of failure
+unless otherwise specified. For example, you don't have to explicitely
+check the result of L<new|"new">, it will already thrown an exception in
+case of bad arguments.
 
 =over
 
@@ -211,7 +223,7 @@ You could for example use this to print a list of numbers from low to high:
     use Heap::Simple;
 
     my $heap = Heap::Simple->new;
-    $heap->insert($_) for 8, 3, 14, -1, 3;
+    $heap->insert(8, 3, 14, -1, 3);
     print $heap->extract_top, " " for 1..$heap->count;
     print "\n";
     # Will print: -1 3 3 8 14
@@ -258,7 +270,7 @@ Repeating the example with this order gives:
     use Heap::Simple;
 
     my $heap = Heap::Simple->new(order => ">");
-    $heap->insert($_) for 8, 3, 14, -1, 3;
+    $heap->insert(8, 3, 14, -1, 3);
     print $heap->extract_top, " " for 1..$heap->count;
     print "\n";
     # Will print: 14 8 3 3 -1
@@ -273,7 +285,7 @@ value first. So we could modify the "<" example to:
     use Heap::Simple;
 
     my $heap = Heap::Simple->new(order => "lt");
-    $heap->insert($_) for "ate", 8, 3, "zzzz", 14, -1, 3, "at";
+    $heap->insert("ate", 8, 3, "zzzz", 14, -1, 3, "at");
     print $heap->extract_top, " " for 1..$heap->count;
     print "\n";
     # Will print: -1 14 3 3 8 at ate zzzz
@@ -291,7 +303,7 @@ The standard example now becomes:
     use Heap::Simple;
 
     my $heap = Heap::Simple->new(order => "gt");
-    $heap->insert($_) for "ate", 8, 3, "zzzz", 14, -1, 3, "at";
+    $heap->insert("ate", 8, 3, "zzzz", 14, -1, 3, "at");
     print $heap->extract_top, " " for 1..$heap->count;
     print "\n";
     # Will print: zzzz ate at 8 3 3 14 -1
@@ -307,7 +319,7 @@ ordering type.
 Every time two keys need to be compared, the given code reference will be
 called like:
 
-    $less = $code_reference($key1, $key2);
+    $less = $code_reference->($key1, $key2);
 
 This should return a true value if $key1 is smaller than $key2 and a false
 value otherwise (actually, since the order of equal elements is unspecified,
@@ -324,7 +336,7 @@ Example:
     sub more { return $_[0] > $_[1] }
 
     my $heap = Heap::Simple->new(order => \&more);
-    $heap->insert($_) for 8, 3, 14, -1, 3;
+    $heap->insert(8, 3, 14, -1, 3);
     print $heap->extract_top, " " for 1..$heap->count;
     print "\n";
     # Will print: 14 8 3 3 -1
@@ -351,8 +363,8 @@ Here's an example of such "fake" keys:
 
     my $heap = Heap::Simple->new(order => "lt",
                                  elements => [Function => \&key]);
-    $heap->insert($_) for qw(Athens5.gr Athens40.gr
-                             Amsterdam51.nl Amsterdam5.nl amsterdam20.nl);
+    $heap->insert(qw(Athens5.gr Athens40.gr
+                     Amsterdam51.nl Amsterdam5.nl amsterdam20.nl));
     print $heap->extract_top, "\n" for 1..$heap->count;
     # This will print:
     Amsterdam5.nl
@@ -494,7 +506,7 @@ such that key access is cheap and insert that. Since this is so common,
 this element type is provided for that.
 
 So this element type will only call $method_name once on the initial insert,
-after which internally the key is entered together with the value. This makes
+after which internally the key is stored together with the value. This makes
 it faster, but it also uses more memory.
 
 It also means that it's now perfectly fine to make changes to the object
@@ -531,6 +543,7 @@ An example:
         my $items = shift;
         my $price = 0;
         $price += $_->price for @$items;
+	return $price;
     }
 
     my $heap = Heap::Simple->new(elements => [Function => \&price]);
@@ -573,9 +586,8 @@ Or we can use it to simplify the hash sort on key example a bit:
 
     my $heap = Heap::Simple->new(order => "lt",
                                  elements => "Any");
-    while (my ($key, $val) = each %hash) {
-        $heap->key_insert($key, $val);
-    }
+    # A hash in list context returns a sequence of key/value pairs
+    $heap->key_insert(%hash);
     for (1..$heap->count) {
         print $heap->extract_top, "\n";
     }
@@ -599,7 +611,7 @@ You can for example use this to determine the three highest values in an array:
     my @array = qw(19 3 7 -5 3 18 1);
 
     my $heap = Heap::Simple->new(max_count => 3);
-    $heap->insert($_) for @array;
+    $heap->insert(@array);
     print "The three highest values are: ", join(", " => $heap->values), "\n";
 
     # Will print: The three highest values are: 7, 19, 18
@@ -612,21 +624,31 @@ code to run when you do heap operations like L<insert|"insert"> or
 L<extract_top|"extract_top">. If these throw an exception, the heap can
 be left in an incorrect half changed state.
 
-If you give a true value to can_die, the code for these operations will be
-changed so that they will properly recover by undoing what just got changed
-(so a failing operation becomes a no-op). This however will slow down these
-operations somewhat, so the default is actually false (most of the time getting
-exceptions during the heap operations is impossible anyways).
+If you give a true value to can_die, the code for single element operations
+will be changed so that they will properly recover by undoing what just got
+changed (so a failing operation becomes a no-op). This however will slow down
+these operations somewhat, so the default is actually false (most of the time
+getting exceptions during the heap operations is impossible anyways).
+
+Operations that insert or extract multiple elements will also get their code
+changed so the heap is always left in a consistent state, but the operation
+is not atomic since it could already be executed on some of the elements.
+You could even lose elements if for example an L<extract_all|"extract_all">
+fails halfway through (the already extracted part is gone from the heap but you
+never got a chance to store the methods return values).
+
+Multi element operations can be substantially more efficient without this flag
+since it may allow the use of better algorithms.
 
 This is a per heap option, so only those heaps that actually set this will
-see a slowdown.
+see any slowdown.
 
 All operations that don't change the heap (like L<count|"count"> or
 L<top|"top">) are always safe.
 
 Note that all change operations always assume you won't recursively cause
-another change while they are running. If you do that, all bets for consistent
-heaps are are off, even if you set this option.
+another change to the same heap while they are running. If you do that, all
+bets for consistency are are off, even if you set this option.
 
 =item X<dirty>dirty => $bool
 
@@ -671,19 +693,42 @@ Notice that the class into which the resulting heap is blessed will B<not>
 be Heap::Simple. It will be an on demand generated class that will have
 Heap::Simple as an ancestor.
 
-=item X<insert>$heap->insert($element)
+=item X<insert>$heap->insert(@new_elements)
 
-Inserts the $element in the heap. On extraction you get back exactly the same
-$element as you inserted, including a possible L<blessing|perlfunc/"bless">.
+Inserts each of the @new_elements in the heap. On extraction you get back
+exactly the same $element as you inserted, including a possible
+L<blessing|perlfunc/"bless">.
 
-=item X<key_insert>$heap->key_insert($key, $element)
+In case an exception is raised during insert the heap is only guaranteed to be
+in a consistent state if you had set the L<can_die|"new_can_die"> flag to
+L<new|"new">. Even then it's possible that some first part of @new_elements has
+been inserted into the heap while the rest hasn't (they get inserted in the
+order given). You could check how many by calling L<the count method|"count">
+before and after the insert. So even with L<can_die|"new_can_die"> only
+inserts of single elements are atomic.
 
-Inserts the $element in the heap ordered by the given $key. Since in this case
-the key must be stored seperately from the element, this method only exists for
-L<"Object"|"Object"> and L<"Any"|"Any"> heaps.
+Mass insert can be substantially faster if the L<can_die|"new_can_die"> flag
+isn't set though.
+
+=item X<key_insert>$heap->key_insert($key1, $element1, $key2, $element2, ...)
+
+Inserts each $element in the heap ordered by the $key given just before it.
+Since in this case the key must be stored seperately from the element, this
+method only exists for L<"Object"|"Object"> and L<"Any"|"Any"> heaps.
 
 On extraction you get back exactly the same $element as you inserted,
 including a possible L<blessing|perlfunc/"bless">.
+
+In case an exception is raised during insert the heap is only guaranteed to be
+in a consistent state if you had set the L<can_die|"new_can_die"> flag to
+L<new|"new">. Even then it's possible that some first part of the argument list
+has been inserted into the heap while the rest hasn't (they get inserted in
+the order given). You could check how many by calling
+L<the count method|"count"> before and after the insert. So even with
+L<can_die|"new_can_die"> only inserts of single key/element pairs are atomic.
+
+Mass insert can be substantially faster if the L<can_die|"new_can_die"> flag
+isn't set though.
 
 =item X<extract_top>$element = $heap->extract_top
 
@@ -695,7 +740,7 @@ The old name is still supported but is deprecated.
 
 Throws an exception if the heap is empty.
 
-=item X<extract_first>$element = $heap->extract_top
+=item X<extract_first>$element = $heap->extract_first
 
 Like L<extract_top|"extract_top">, but if the heap is empty it will
 return undef (in scalar context).
@@ -723,7 +768,7 @@ Example:
     use Heap::Simple;
 
     my $heap = Heap::Simple->new;
-    $heap->insert($_) for 8, 3, 14, -1, 3;
+    $heap->insert(8, 3, 14, -1, 3);
     print $heap->first, "\n";
     # prints -1
 
@@ -737,7 +782,7 @@ Example:
     use Heap::Simple;
 
     my $heap = Heap::Simple->new;
-    $heap->insert($_) for 8, 3, 14, -1, 3;
+    $heap->insert(8, 3, 14, -1, 3);
     print $heap->first_key, "\n";
     # prints -1
 
@@ -752,7 +797,7 @@ Example:
     use Heap::Simple;
 
     my $heap = Heap::Simple->new;
-    $heap->insert($_) for 8, 3, 14, -1, 3;
+    $heap->insert(8, 3, 14, -1, 3);
     print $heap->top_key, "\n";
     # prints -1
 
@@ -773,7 +818,7 @@ Example:
     use Heap::Simple;
 
     my $heap = Heap::Simple->new;
-    $heap->insert($_) for 8, 3, 14, -1, 3;
+    $heap->insert(8, 3, 14, -1, 3);
     print join(", ", $heap->extract_upto(3)), "\n";
     # prints -1, 3, 3
 
@@ -781,6 +826,35 @@ This method will lose values in case of an exception even if
 L<can_die|"new_can_die"> is true (remember that exceptions of this type are
 only possible if you have a self coded key fetch or compare that can die, so
 this is normally irrelevant).
+
+=item X<extract_all>@elements = $heap->extract_all
+
+Extracts all elements from $heap and returns them ordered by key value (low to
+high with repect to the heap order).
+
+Example:
+
+    use Heap::Simple;
+
+    my $heap = Heap::Simple->new;
+    $heap->insert(8, 3, 14, -1, 3);
+    print join(", ", $heap->extract_all), "\n";
+    # prints -1, 3, 3, 8, 14
+
+This method can lose values in case of an exception even if
+L<can_die|"new_can_die"> is true (remember that exceptions of this type are
+only possible if you have a key fetch or compare that can die, so this is
+normally irrelevant).
+
+If you don't actually care about the order of the elements it's more efficient
+to use L<values|"values"> followed by L<clear|"clear">.
+
+It's unspecified what this method returns in scalar context.
+
+=item X<clear>$heap->clear
+
+Removes all elements from the heap. This can be much more efficient than using
+L<extract_all|"extract_all"> in a void context.
 
 =item X<count>$count = $heap->count
 
@@ -790,13 +864,9 @@ This is an constant time operation, it doesn't really need to count anything.
     use Heap::Simple;
 
     my $heap = Heap::Simple->new;
-    $heap->insert($_) for 8, 3, 14, -1, 3;
+    $heap->insert(8, 3, 14, -1, 3);
     print $heap->count, "\n";
     # prints 5
-
-=item X<clear>$heap->clear
-
-Removes all elements from the heap.
 
 =item X<keys>@keys = $heap->keys
 
@@ -879,7 +949,7 @@ only be true for the L<"Any"|"Any"> and L<Object|"Object"> type heaps.
 =item X<max_count>$max_count => $heap->max_count
 
 Returns the maximum size of the heap, or infinity if there is no maximum (the
-default unless you used the L<max_count|"new_max_count"> option.
+default unless you used the L<max_count|"new_max_count"> option).
 
 =item X<can_die>$can_die = $heap->can_die
 
@@ -905,39 +975,52 @@ that type needed (e.g. the key name for a L<Hash|"Hash"> type).
 Like the list context version, but only returns the first entry (the canonical
 type name).
 
-=item X<absorb>$heap1->absorb($heap2)
+=item X<absorb>$heap->absorb(@heaps)
 
-Take all elements from $heap2 and inserts them in $heap1, leaving $heap2 empty.
-Behaves a bit like:
+Takes all elements from each heap in @heaps and inserts them in $heap1,
+leaving each heap in @heaps empty. Behaves a bit like:
 
-    $heap1->insert($_) for reverse $heap2->values;
-    $heap2->clear;
+    for my $work_heap (@heaps) {
+        $heap->insert($_) for reverse $work_heap->values;
+        $work_heap->clear;
+    }
 
 except that it's much more efficient.
 
 If an exception is possible and gets raised during insert, the heaps will be
 left in a consistent state with a partial transfer completed on the condition
-that L<can_die|"new_can_die"> is set for $heap1 (the setting for $heap2 is
-irrelevant, the accesses there will always be done in a safe way)
+that L<can_die|"new_can_die"> is set for $heap (the settings for the heaps in
+@heaps are irrelevant, their accesses there will always be done in a safe way)
 
-=item X<key_absorb>$heap1->key_absorb($heap2)
+=item X<key_absorb>$heap->key_absorb(@heaps)
 
-Take all elements from $heap2 and key_inserts them in $heap1, leaving $heap2
-empty. Behaves a bit like:
+Takes all elements from each heap in @heaps and key_inserts them in $heap,
+leaving each heap in @heaps empty. Behaves a bit like:
 
-    my @values = $heap2->values;
-    my @keys   = $heap2->keys;
-    $heap1->key_insert(pop @keys, pop @values) while @values;
-    $heap2->clear;
+    for my $work_heap (@heaps) {
+        my @values = $work_heap->values;
+        my @keys   = $work_heap->keys;
+        $heap->key_insert(pop @keys, pop @values) while @values;
+        $work_heap->clear;
+    }
 
 except that it's much more efficient. This is mainly meant for transfer between
-wrapped heap types (L<Any|"Any"> and L<Object|"Object"> (it avoids key
-recalculation). $heap1 must of course be a wrapped heap type.
+wrapped heap types (L<Any|"Any"> and L<Object|"Object">) since it avoids key
+recalculation. $heap must of course be a wrapped heap type.
 
-If an exception is possible and gets raised during insert, the heaps will be
+If an exception is possible and gets raised during insert, all heaps will be
 left in a consistent state with a partial transfer completed on the condition
-that L<can_die|"new_can_die"> is set for $heap1 (the setting for $heap2 is
-irrelevant, the accesses there will always be done in a safe way)
+that L<can_die|"new_can_die"> is set for $heap (the setting for the heaps in
+@heaps are irrelevant, their accesses there will always be done in a safe way)
+
+=item X<merge_arrays>my $merged_aref = $heap->merge_arrays($aref1, $aref2, ...)
+
+This is a convenience function that does something like
+
+    $merge_aref = [sort { $heap->compare_function->($a, $b) } map @$_, @_;
+
+except that it's more efficient (e.g. it uses the knowledge that the
+argument arrays are already sorted).
 
 =item X<implementation>$implementation = Heap::Simple->implementation
 
@@ -959,7 +1042,7 @@ L<Array::Heap2>
 
 =head1 AUTHOR
 
-Ton Hospel, E<lt>Heap::Simple@ton.iguana.beE<gt>
+Ton Hospel, E<lt>Heap-Simple@ton.iguana.beE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 

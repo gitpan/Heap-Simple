@@ -1,5 +1,17 @@
 Revision history for Perl extension Heap::Simple.
 
+0.10	2005-11-20
+	- Fetch required versions of Heap::Simple::XS and Heap::Simple::Perl in
+          Makefile.PL, and warn about out of order upgrades.
+	- Updated documentation (fixes, new functionality)
+	    - insert/key_insert can now take a variable number of arguments
+	    - absorb/key_absorb can now take a variable number of arguments
+	    - new method merge_arrays
+	    - new method extract_all
+        - Updated minimum version numbers of Heap::Simple::Perl and 
+          Heap::Simple::XS so that they support the new documented features
+	- Replaced :: by - in author email address (easier quoting for mailers)
+
 0.09  2004-11-11
 	- Remove double documentation of "first"
         - Fixed email in Makefile.PL
