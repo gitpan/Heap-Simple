@@ -22,7 +22,7 @@ exists $want{Perl} ||
 
 if ($xs) {
     if ($xs < $want{XS}) {
-        print <<'EOT'
+        print <<"EOT"
 
 I would like to use 'Heap::Simple::XS' on your setup, but you only have version
 $xs, while I need at least $want{XS}, so I won't as things stand now. This is
@@ -32,7 +32,7 @@ prefer to upgrade Heap::Simple::XS first.
 
 EOT
     } else {
-        print <<'EOT'
+        print <<"EOT"
 
 I will probably use 'Heap::Simple::XS' on your setup. Very good.
 (the actual decission is deferred to runtime).

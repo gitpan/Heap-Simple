@@ -1,5 +1,9 @@
 Revision history for Perl extension Heap::Simple.
 
+0.11	2005-11-30
+	- Fixed a missing interpolation in Makefile.PL. This only changes
+	  the text shown during make and doesn't change any functionality.
+
 0.10	2005-11-20
 	- Fetch required versions of Heap::Simple::XS and Heap::Simple::Perl in
           Makefile.PL, and warn about out of order upgrades.

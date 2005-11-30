@@ -4,7 +4,7 @@ use strict;
 
 # Switch selecting XS or pure perl
 use vars qw($VERSION @ISA @implementors);
-$VERSION = "0.10";
+$VERSION = "0.11";
 
 unless (@ISA) {
     @implementors = qw(Heap::Simple::XS(0.08) Heap::Simple::Perl(0.11))
@@ -977,15 +977,15 @@ type name).
 
 =item X<absorb>$heap->absorb(@heaps)
 
-Takes all elements from each heap in @heaps and inserts them in $heap1,
+Takes all elements from each heap in @heaps and inserts them in $heap,
 leaving each heap in @heaps empty. Behaves a bit like:
 
     for my $work_heap (@heaps) {
-        $heap->insert($_) for reverse $work_heap->values;
+        $heap->insert(reverse $work_heap->values);
         $work_heap->clear;
     }
 
-except that it's much more efficient.
+except that it may be more efficient.
 
 If an exception is possible and gets raised during insert, the heaps will be
 left in a consistent state with a partial transfer completed on the condition
@@ -1004,9 +1004,9 @@ leaving each heap in @heaps empty. Behaves a bit like:
         $work_heap->clear;
     }
 
-except that it's much more efficient. This is mainly meant for transfer between
-wrapped heap types (L<Any|"Any"> and L<Object|"Object">) since it avoids key
-recalculation. $heap must of course be a wrapped heap type.
+except that it's may be more efficient. This is mainly meant for transfer
+between wrapped heap types (L<Any|"Any"> and L<Object|"Object">) since it
+avoids key recalculation. $heap must of course be a wrapped heap type.
 
 If an exception is possible and gets raised during insert, all heaps will be
 left in a consistent state with a partial transfer completed on the condition
@@ -1015,12 +1015,19 @@ that L<can_die|"new_can_die"> is set for $heap (the setting for the heaps in
 
 =item X<merge_arrays>my $merged_aref = $heap->merge_arrays($aref1, $aref2, ...)
 
-This is a convenience function that does something like
+This convenience function merges a sequence of references to already sorted
+arrays into a new sorted array and returns its reference.
+So it does something like
 
     $merge_aref = [sort { $heap->compare_function->($a, $b) } map @$_, @_;
+    shift @$merge_aref until @$merge_aref <= $heap->max_count;
 
 except that it's more efficient (e.g. it uses the knowledge that the
 argument arrays are already sorted).
+
+It leaves values stored in the $heap completely untouched. $heap is 
+only used for its attributes, how to find the key, what the compare function is
+and the maximum number of elements.
 
 =item X<implementation>$implementation = Heap::Simple->implementation
 
