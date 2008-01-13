@@ -1,4 +1,8 @@
 #! /usr/bin/perl -w
+use strict;
+use vars qw($VERSION);
+$VERSION = "0.11";
+
 use ExtUtils::MakeMaker;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
@@ -7,7 +11,7 @@ my $xs   = eval 'use Heap::Simple::XS;   $Heap::Simple::XS::VERSION   || 0.01';
 my $perl = eval 'use Heap::Simple::Perl; $Heap::Simple::Perl::VERSION || 0.01';
 
 my %want;
-my $simple = "Simple.pm";
+my $simple = "lib/Heap/Simple.pm";
 open(local *SIMPLE, "< $simple") || die "Could not open $simple: $!";
 while (<SIMPLE>) {
     while (/\bHeap::Simple::(\w+)\(([^\)]+)\)/g) {
@@ -72,9 +76,31 @@ two.
 EOT
 }
 WriteMakefile
-    (NAME              => 'Heap::Simple',
-     VERSION_FROM      => 'Simple.pm', # finds $VERSION
-     PREREQ_PM         => {}, # e.g., Module::Name => 1.1
-     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
-      (AUTHOR         => 'Ton Hospel <Heap-Simple@ton.iguana.be>') : ()),
+    (NAME		=> 'Heap::Simple',
+     VERSION_FROM	=> "lib/Heap/Simple/Package.pm",
+     PREREQ_PM		=> {}, # e.g., Module::Name => 1.1
+     ($] >= 5.005 ?	## Add these new keywords supported since 5.005
+      (AUTHOR		=> 'Ton Hospel <Heap-Simple@ton.iguana.be>') : ()),
+     $^O eq "MSWin32" ? (
+         PM_FILTER	=> '$(PERL) -p -e1',
+     ) : (),
+     clean		=> {
+         FILES => '$(DISTNAME).ppd ppm',
+     },
 );
+
+package MY;
+sub postamble {
+    return shift->SUPER::postamble() . <<"EOF";
+ppm: \$(DISTNAME).ppd
+
+\$(DISTNAME).ppd: all ppd
+	makeppd.pl --perl=\$(PERL) --min_version=1.011 --zip=\$(ZIP) --tar=\$(TAR) --compress="\$(COMPRESS)" --leave=ppm \$(DISTNAME).ppd \$(VERSION)
+
+ppm_install: \$(DISTNAME).ppd
+	ppm install ppm/\$(DISTNAME).ppd
+
+ppm_upgrade: \$(DISTNAME).ppd
+	ppm upgrade -install ppm/\$(DISTNAME).ppd
+EOF
+}

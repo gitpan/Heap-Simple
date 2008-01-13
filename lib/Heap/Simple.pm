@@ -4,10 +4,10 @@ use strict;
 
 # Switch selecting XS or pure perl
 use vars qw($VERSION @ISA @implementors);
-$VERSION = "0.11";
+$VERSION = "0.12";
 
 unless (@ISA) {
-    @implementors = qw(Heap::Simple::XS(0.08) Heap::Simple::Perl(0.11))
+    @implementors = qw(Heap::Simple::XS(0.10) Heap::Simple::Perl(0.11))
         unless @implementors;
     for my $i (@implementors) {
         my $plugin = $i;
@@ -131,14 +131,14 @@ When key and value are kept separate:
     $heap->key_insert(8, "bar");
     $heap->key_insert(5, "foo");
 
-    # This will print foo (5 is the top key)
+    # This will print foo (5 is the lowest key)
     print "First value is ", $heap->extract_top, "\n";
 
     $heap->key_insert(7, "baz");
 
-    # This will print baz (7 is the top key)
+    # This will print baz (7 is the lowest key)
     print "Next value is ", $heap->extract_top, "\n";
-    # This will print bar (8 is now the top key)
+    # This will print bar (8 is now the lowest key)
     print "Next value is ", $heap->extract_top, "\n";
 
 =head1 EXAMPLE2
@@ -157,14 +157,14 @@ When the key is part of the value:
     $heap->insert([8, "bar"]);
     $heap->insert([5, "foo"]);
 
-    # This will print [5, foo] (5 is the top key)
+    # This will print [5, foo] (5 is the lowest key)
     print "First value is ", Dumper($heap->extract_top), "\n";
 
     $heap->insert([7, "baz"]);
 
-    # This will print [7, baz] (7 is the top key)
+    # This will print [7, baz] (7 is the lowest key)
     print "Next value is ", Dumper($heap->extract_top), "\n";
-    # This will print [8, bar] (8 is now the top key)
+    # This will print [8, bar] (8 is now the lowest key)
     print "Next value is ", Dumper($heap->extract_top), "\n";
 
 =head1 DESCRIPTION
@@ -322,9 +322,8 @@ called like:
     $less = $code_reference->($key1, $key2);
 
 This should return a true value if $key1 is smaller than $key2 and a false
-value otherwise (actually, since the order of equal elements is unspecified,
-it's ok to return true in case of equality too). $code_reference should
-imply a total order relation, so it needs to be transitive.
+value otherwise. $code_reference should imply a total order relation, so it
+needs to be transitive.
 
 Since in this case nothing can be determined about the key type, there will
 be no infinity by default (even if the keys are numbers).
@@ -384,11 +383,11 @@ the key values.
 The $element_type is usually an array reference, but if the array has only
 one entry, you may use that directly. So you can use:
 
-    elements => "Array"
+    elements => "Scalar"
 
 instead of:
 
-    elements => ["Array"]
+    elements => ["Scalar"]
 
 The following element types are currently supported:
 
@@ -554,7 +553,7 @@ An example:
 
 The same discussion as under L<Object|"Object"> applies for
 L<Function|"Function">: single insert and extract on a size n heap will call
-the code reference O(log n) times, which could be get slow.
+the code reference O(log n) times, which could get slow.
 
 So if you are prepared to use more memory, you can again tell Heap::Simple
 to calculate the key already at insert time, and store it together with the
@@ -604,7 +603,8 @@ dropped (the thing just being inserted is among the candidates for dropping).
 
 A max count of 0 may or may not be supported depending on the implementor.
 
-You can for example use this to determine the three highest values in an array:
+You can for example use this to efficiently determine the three highest values
+in an array:
 
     use Heap::Simple;
 
@@ -665,8 +665,10 @@ The default is no dirty optimizations.
 
 =item X<new_user_data>user_data => $user_data
 
-You can associate one scalar worth of user data with any heap. This option
-allows you to set its value already at object creation. You can use the
+You can associate one scalar worth of user data with any heap. That scalar can
+of course also be a reference to a more complex data structure, allowing you to
+effectively associate any amount of data with the heap. This option allows you
+to set this scalar value already at object creation. You can use the
 L<user_data|"user_data"> method to get/set the associated value.
 
 If this option is not given, the heap starts with "undef" associated to it.
@@ -904,11 +906,12 @@ key.
 
 =item X<user_data>$user_data = $heap->user_data
 
-Queries the user_data associated with the heap.
+Queries the L<user_data|"new_user_data"> associated with the heap.
 
 =item $old_data = $heap->user_data($new_data)
 
-Associates new user_data with the heap. Returns the old value.
+Associates new L<user_data|"new_user_data"> with the heap. Returns the old
+value.
 
 =item X<infinity>$infinity = $heap->infinity
 
@@ -961,7 +964,7 @@ Returns the L<dirty|"new_dirty"> setting for this heap.
 
 =item X<order>$order = $heap->order
 
-Returns the L<order|"new_order"> setting for this heap (either C<E<lt>>, C<E<gt>>, C<lt>, C<gt> or a code reference).
+Returns the L<order|"new_order"> setting for this heap (either C<"E<lt>">, C<"E<gt>">, C<"lt">, C<"gt"> or a code reference).
 
 =item X<elements>@elements = $heap->elements
 
@@ -990,7 +993,7 @@ except that it may be more efficient.
 If an exception is possible and gets raised during insert, the heaps will be
 left in a consistent state with a partial transfer completed on the condition
 that L<can_die|"new_can_die"> is set for $heap (the settings for the heaps in
-@heaps are irrelevant, their accesses there will always be done in a safe way)
+@heaps are irrelevant, their accesses will always be done in a safe way)
 
 =item X<key_absorb>$heap->key_absorb(@heaps)
 
@@ -1011,7 +1014,7 @@ avoids key recalculation. $heap must of course be a wrapped heap type.
 If an exception is possible and gets raised during insert, all heaps will be
 left in a consistent state with a partial transfer completed on the condition
 that L<can_die|"new_can_die"> is set for $heap (the setting for the heaps in
-@heaps are irrelevant, their accesses there will always be done in a safe way)
+@heaps are irrelevant, their accesses will always be done in a safe way)
 
 =item X<merge_arrays>my $merged_aref = $heap->merge_arrays($aref1, $aref2, ...)
 
@@ -1025,8 +1028,8 @@ So it does something like
 except that it's more efficient (e.g. it uses the knowledge that the
 argument arrays are already sorted).
 
-It leaves values stored in the $heap completely untouched. $heap is 
-only used for its attributes, how to find the key, what the compare function is
+It leaves values stored in the $heap completely untouched. $heap is
+only used for its attributes: how to find the key, what the compare function is
 and the maximum number of elements.
 
 =item X<implementation>$implementation = Heap::Simple->implementation
