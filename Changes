@@ -1,5 +1,12 @@
 Revision history for Perl extension Heap::Simple.
 
+0.13	2008-01-27 14:57:46 UT
+	- No functional changes
+	- Added "cover" and "ppm uninstall private make targets
+	- Removed "ppm_update" private make target
+	- Demand Heap::Simple::Perl 0.13 which got a workaround for a perl 5.6
+	  bug
+
 0.12	2008-01-13 16:17:30 UT
 	- No functional changes
 	- Removed the comment that for equal keys the code reference order is
@@ -7,7 +14,7 @@ Revision history for Perl extension Heap::Simple.
 	  and it can confuse things like "extract_upto".
 	- Small clarifications in the documentation
 	- Added MANIFEST.SKIP
-	- added "ppm_install" and "ppm_update" make targets
+	- added private "ppm_install" and "ppm_update" make targets
 	- Added PackageTools based versioning
 	- Demand at least version 0.10 for Heap::Simple::XS
 	- Stop being a flat distribution

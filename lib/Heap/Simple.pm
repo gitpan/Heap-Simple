@@ -4,10 +4,10 @@ use strict;
 
 # Switch selecting XS or pure perl
 use vars qw($VERSION @ISA @implementors);
-$VERSION = "0.12";
+$VERSION = "0.13";
 
 unless (@ISA) {
-    @implementors = qw(Heap::Simple::XS(0.10) Heap::Simple::Perl(0.11))
+    @implementors = qw(Heap::Simple::XS(0.10) Heap::Simple::Perl(0.13))
         unless @implementors;
     for my $i (@implementors) {
         my $plugin = $i;
